@@ -1,0 +1,166 @@
+using System.Text;
+using System.Text.RegularExpressions;
+using PROCTOR.Domain.Entities;
+using PROCTOR.Domain.Enums;
+using PROCTOR.Application.DTOs.Cases;
+using PROCTOR.Application.DTOs.Dashboard;
+using PROCTOR.Application.DTOs.Documents;
+using PROCTOR.Application.DTOs.Hearings;
+using PROCTOR.Application.DTOs.Notes;
+using PROCTOR.Application.DTOs.Permissions;
+using PROCTOR.Application.DTOs.Users;
+
+namespace PROCTOR.Application.Mapping;
+
+public static class MappingExtensions
+{
+    public static string ToKebabCase(this Enum value)
+    {
+        var name = value.ToString();
+        if (string.IsNullOrEmpty(name)) return name;
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            if (char.IsUpper(c) && i > 0)
+            {
+                var prevIsLower = char.IsLower(name[i - 1]);
+                var prevIsDigit = char.IsDigit(name[i - 1]);
+                if (prevIsLower || prevIsDigit)
+                {
+                    sb.Append('-');
+                }
+            }
+            else if (char.IsDigit(c) && i > 0 && char.IsLetter(name[i - 1]))
+            {
+                sb.Append('-');
+            }
+            sb.Append(char.ToLowerInvariant(c));
+        }
+
+        return sb.ToString();
+    }
+
+    public static T ParseEnum<T>(string kebabCase) where T : struct, Enum
+    {
+        // Convert kebab-case to PascalCase
+        var parts = kebabCase.Split('-');
+        var sb = new StringBuilder();
+        foreach (var part in parts)
+        {
+            if (part.Length > 0)
+            {
+                sb.Append(char.ToUpperInvariant(part[0]));
+                if (part.Length > 1)
+                    sb.Append(part[1..]);
+            }
+        }
+
+        var pascalCase = sb.ToString();
+        if (Enum.TryParse<T>(pascalCase, ignoreCase: true, out var result))
+            return result;
+
+        throw new ArgumentException($"Invalid value '{kebabCase}' for enum {typeof(T).Name}");
+    }
+
+    public static UserDto ToDto(this User user) => new()
+    {
+        Id = user.Id.ToString(),
+        Name = user.Name,
+        Email = user.Email,
+        Role = user.Role.ToKebabCase(),
+        Avatar = user.Avatar
+    };
+
+    public static CaseDto ToDto(this Case c) => new()
+    {
+        Id = c.Id.ToString(),
+        CaseNumber = c.CaseNumber,
+        StudentName = c.StudentName,
+        StudentId = c.StudentId,
+        Type = c.Type.ToKebabCase(),
+        Status = c.Status.ToKebabCase(),
+        Priority = c.Priority.ToKebabCase(),
+        AssignedTo = c.AssignedTo?.Name,
+        CreatedDate = c.CreatedAt.ToString("o"),
+        UpdatedDate = c.UpdatedAt.ToString("o"),
+        Description = c.Description,
+        Documents = c.Documents.Select(d => d.ToDto()).ToList(),
+        Notes = c.Notes.Select(n => n.ToDto()).ToList(),
+        Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
+        Timeline = c.TimelineEvents.Select(t => t.ToDto()).ToList()
+    };
+
+    public static CaseListDto ToListDto(this Case c) => new()
+    {
+        Id = c.Id.ToString(),
+        CaseNumber = c.CaseNumber,
+        StudentName = c.StudentName,
+        StudentId = c.StudentId,
+        Type = c.Type.ToKebabCase(),
+        Status = c.Status.ToKebabCase(),
+        Priority = c.Priority.ToKebabCase(),
+        AssignedTo = c.AssignedTo?.Name,
+        CreatedDate = c.CreatedAt.ToString("o"),
+        UpdatedDate = c.UpdatedAt.ToString("o"),
+        Description = c.Description
+    };
+
+    public static DocumentDto ToDto(this Document d) => new()
+    {
+        Id = d.Id.ToString(),
+        Name = d.Name,
+        Type = d.Type.ToKebabCase(),
+        Url = d.Url,
+        UploadedBy = d.UploadedBy,
+        UploadedDate = d.CreatedAt.ToString("o")
+    };
+
+    public static NoteDto ToDto(this Note n) => new()
+    {
+        Id = n.Id.ToString(),
+        Content = n.Content,
+        Author = n.Author,
+        CreatedDate = n.CreatedAt.ToString("o")
+    };
+
+    public static HearingDto ToDto(this Hearing h) => new()
+    {
+        Id = h.Id.ToString(),
+        CaseId = h.CaseId.ToString(),
+        Date = h.Date,
+        Time = h.Time,
+        Location = h.Location,
+        Participants = h.Participants,
+        Status = h.Status.ToKebabCase(),
+        Notes = h.Notes
+    };
+
+    public static RecentActivityDto ToDto(this TimelineEvent t) => new()
+    {
+        Id = t.Id.ToString(),
+        Action = t.Action,
+        Description = t.Description,
+        User = t.User,
+        Timestamp = t.CreatedAt.ToString("o")
+    };
+
+    public static RoleDto ToDto(this Role r) => new()
+    {
+        Id = r.Id.ToString(),
+        RoleName = r.RoleName.ToKebabCase(),
+        DisplayName = r.DisplayName,
+        MenuPermissions = r.MenuPermissions.Select(mp => mp.ToDto()).ToList()
+    };
+
+    public static MenuPermissionDto ToDto(this MenuPermission mp) => new()
+    {
+        Id = mp.Id.ToString(),
+        MenuKey = mp.MenuKey,
+        CanCreate = mp.CanCreate,
+        CanRead = mp.CanRead,
+        CanUpdate = mp.CanUpdate,
+        CanDelete = mp.CanDelete
+    };
+}
