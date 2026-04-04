@@ -41,7 +41,7 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
     public void Update(T entity)
     {
         entity.UpdatedAt = DateTime.UtcNow;
-        _dbSet.Update(entity);
+        _context.Entry(entity).State = EntityState.Modified;
     }
 
     public void Remove(T entity)

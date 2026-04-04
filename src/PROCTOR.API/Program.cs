@@ -97,6 +97,11 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseCors("AllowFrontend");
 
+// Serve uploaded files from wwwroot/uploads
+var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "uploads");
+Directory.CreateDirectory(uploadsPath);
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

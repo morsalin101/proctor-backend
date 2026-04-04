@@ -6,4 +6,5 @@ public interface IUnitOfWork : IDisposable
     ICaseRepository Cases { get; }
     IHearingRepository Hearings { get; }
     Task<int> SaveChangesAsync();
+    void Add<T>(T entity) where T : class;
 }

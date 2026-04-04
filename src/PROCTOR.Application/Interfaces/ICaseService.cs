@@ -10,4 +10,5 @@ public interface ICaseService
     Task<ApiResponse<CaseDto>> CreateCaseAsync(CreateCaseRequest request, string createdBy);
     Task<ApiResponse<CaseDto>> UpdateCaseAsync(Guid id, UpdateCaseRequest request);
     Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy);
+    Task<ApiResponse<bool>> DeleteCaseAsync(Guid id);
 }

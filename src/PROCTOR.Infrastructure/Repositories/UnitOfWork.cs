@@ -24,6 +24,11 @@ public class UnitOfWork : IUnitOfWork
         return await _context.SaveChangesAsync();
     }
 
+    public void Add<T>(T entity) where T : class
+    {
+        _context.Set<T>().Add(entity);
+    }
+
     public void Dispose()
     {
         _context.Dispose();

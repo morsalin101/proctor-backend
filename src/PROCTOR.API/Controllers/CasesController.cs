@@ -76,4 +76,14 @@ public class CasesController : ControllerBase
 
         return Ok(response);
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteCase(Guid id)
+    {
+        var response = await _caseService.DeleteCaseAsync(id);
+        if (!response.Success)
+            return NotFound(response);
+
+        return Ok(response);
+    }
 }

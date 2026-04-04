@@ -17,6 +17,7 @@ public class ProctorDbContext : DbContext
     public DbSet<Hearing> Hearings => Set<Hearing>();
     public DbSet<TimelineEvent> TimelineEvents => Set<TimelineEvent>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

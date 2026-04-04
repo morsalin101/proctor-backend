@@ -12,5 +12,6 @@ public enum CaseStatus
     Resolved,
     Closed,
     Rejected,
-    OnHold
+    OnHold,
+    SuggestedType2
 }

@@ -11,10 +11,12 @@ namespace PROCTOR.Application.Services;
 public class CaseService : ICaseService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
-    public CaseService(IUnitOfWork unitOfWork)
+    public CaseService(IUnitOfWork unitOfWork, INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetCasesAsync(
@@ -79,6 +81,11 @@ public class CaseService : ICaseService
 
         // Reload with details
         var created = await _unitOfWork.Cases.GetByIdWithDetailsAsync(newCase.Id);
+
+        // Notify relevant roles
+        await _notificationService.CreateAsync(null, "proctor", "New Case Submitted",
+            $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+
         return ApiResponse<CaseDto>.SuccessResponse(created!.ToDto(), "Case created successfully.");
     }
 
@@ -100,20 +107,24 @@ public class CaseService : ICaseService
             c.Status = CaseStatus.Assigned;
         }
 
-        c.UpdatedAt = DateTime.UtcNow;
+        _unitOfWork.Cases.Update(c);
 
-        var timelineEvent = new TimelineEvent
+        _unitOfWork.Add(new TimelineEvent
         {
             Id = Guid.NewGuid(),
             CaseId = c.Id,
             Action = "Case Updated",
             Description = "Case details were updated.",
             User = "System"
-        };
-        c.TimelineEvents.Add(timelineEvent);
+        });
 
-        _unitOfWork.Cases.Update(c);
         await _unitOfWork.SaveChangesAsync();
+
+        if (request.AssignedToId is not null)
+        {
+            await _notificationService.CreateAsync(Guid.Parse(request.AssignedToId), null,
+                "Case Assigned", $"You have been assigned to case {c.CaseNumber}.", c.Id);
+        }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case updated successfully.");
@@ -128,34 +139,48 @@ public class CaseService : ICaseService
         var oldStatus = c.Status;
         var newStatus = MappingExtensions.ParseEnum<CaseStatus>(request.Status);
         c.Status = newStatus;
-        c.UpdatedAt = DateTime.UtcNow;
 
-        var timelineEvent = new TimelineEvent
+        _unitOfWork.Cases.Update(c);
+
+        _unitOfWork.Add(new TimelineEvent
         {
             Id = Guid.NewGuid(),
             CaseId = c.Id,
             Action = "Status Changed",
             Description = $"Status changed from {oldStatus.ToKebabCase()} to {newStatus.ToKebabCase()}.",
             User = updatedBy
-        };
-        c.TimelineEvents.Add(timelineEvent);
+        });
 
         if (!string.IsNullOrWhiteSpace(request.Note))
         {
-            var note = new Note
+            _unitOfWork.Add(new Note
             {
                 Id = Guid.NewGuid(),
                 CaseId = c.Id,
                 Content = request.Note,
                 Author = updatedBy
-            };
-            c.Notes.Add(note);
+            });
         }
 
-        _unitOfWork.Cases.Update(c);
         await _unitOfWork.SaveChangesAsync();
+
+        // Notify about status change
+        await _notificationService.CreateAsync(null, "proctor",
+            "Case Status Updated", $"Case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case status updated successfully.");
+    }
+
+    public async Task<ApiResponse<bool>> DeleteCaseAsync(Guid id)
+    {
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
+        if (c is null)
+            return ApiResponse<bool>.FailResponse("Case not found.");
+
+        _unitOfWork.Cases.Remove(c);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<bool>.SuccessResponse(true, "Case deleted successfully.");
     }
 }
