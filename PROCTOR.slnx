@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PROCTOR.API/PROCTOR.API.csproj" />
+    <Project Path="src/PROCTOR.Application/PROCTOR.Application.csproj" />
+    <Project Path="src/PROCTOR.Domain/PROCTOR.Domain.csproj" />
+    <Project Path="src/PROCTOR.Infrastructure/PROCTOR.Infrastructure.csproj" />
+  </Folder>
+</Solution>

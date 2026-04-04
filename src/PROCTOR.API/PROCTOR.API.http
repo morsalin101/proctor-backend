@@ -1,0 +1,6 @@
+@PROCTOR.API_HostAddress = http://localhost:5106
+
+GET {{PROCTOR.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
