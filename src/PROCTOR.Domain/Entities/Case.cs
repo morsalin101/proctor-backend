@@ -12,10 +12,14 @@ public class Case : BaseEntity
     public Priority Priority { get; set; }
     public Guid? AssignedToId { get; set; }
     public string Description { get; set; } = string.Empty;
+    public string? Verdict { get; set; }
+    public string? Recommendation { get; set; }
+    public string? ForwardedToRole { get; set; }
 
     public User? AssignedTo { get; set; }
     public ICollection<Document> Documents { get; set; } = new List<Document>();
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Hearing> Hearings { get; set; } = new List<Hearing>();
     public ICollection<TimelineEvent> TimelineEvents { get; set; } = new List<TimelineEvent>();
+    public ICollection<Report> Reports { get; set; } = new List<Report>();
 }

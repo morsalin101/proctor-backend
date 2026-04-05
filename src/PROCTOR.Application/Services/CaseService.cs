@@ -1,5 +1,6 @@
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Cases;
+using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.Interfaces;
 using PROCTOR.Application.Mapping;
 using PROCTOR.Domain.Entities;
@@ -12,11 +13,13 @@ public class CaseService : ICaseService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IWorkflowService _workflowService;
 
-    public CaseService(IUnitOfWork unitOfWork, INotificationService notificationService)
+    public CaseService(IUnitOfWork unitOfWork, INotificationService notificationService, IWorkflowService workflowService)
     {
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _workflowService = workflowService;
     }
 
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetCasesAsync(
@@ -82,8 +85,9 @@ public class CaseService : ICaseService
         // Reload with details
         var created = await _unitOfWork.Cases.GetByIdWithDetailsAsync(newCase.Id);
 
-        // Notify relevant roles
-        await _notificationService.CreateAsync(null, "proctor", "New Case Submitted",
+        // Notify relevant roles based on case type
+        var targetRole = newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
+        await _notificationService.CreateAsync(null, targetRole, "New Case Submitted",
             $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
 
         return ApiResponse<CaseDto>.SuccessResponse(created!.ToDto(), "Case created successfully.");
@@ -130,7 +134,7 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case updated successfully.");
     }
 
-    public async Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy)
+    public async Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy, string userRole)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
@@ -138,7 +142,17 @@ public class CaseService : ICaseService
 
         var oldStatus = c.Status;
         var newStatus = MappingExtensions.ParseEnum<CaseStatus>(request.Status);
+
+        if (!_workflowService.ValidateTransition(oldStatus, newStatus, userRole))
+            return ApiResponse<CaseDto>.FailResponse($"Transition from '{oldStatus.ToKebabCase()}' to '{newStatus.ToKebabCase()}' is not allowed for role '{userRole}'.");
+
         c.Status = newStatus;
+
+        if (!string.IsNullOrWhiteSpace(request.Verdict))
+            c.Verdict = request.Verdict;
+
+        if (!string.IsNullOrWhiteSpace(request.Recommendation))
+            c.Recommendation = request.Recommendation;
 
         _unitOfWork.Cases.Update(c);
 
@@ -164,12 +178,114 @@ public class CaseService : ICaseService
 
         await _unitOfWork.SaveChangesAsync();
 
-        // Notify about status change
-        await _notificationService.CreateAsync(null, "proctor",
+        // Send role-appropriate notifications
+        var notifyRole = newStatus switch
+        {
+            CaseStatus.Verified => "proctor",
+            CaseStatus.ForwardedToRegistrar => "registrar",
+            CaseStatus.ForwardedToCommittee => "disciplinary-committee",
+            CaseStatus.Resolved or CaseStatus.Closed => "proctor",
+            _ => "proctor"
+        };
+
+        await _notificationService.CreateAsync(null, notifyRole,
             "Case Status Updated", $"Case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case status updated successfully.");
+    }
+
+    public async Task<ApiResponse<CaseDto>> ForwardCaseAsync(Guid id, ForwardCaseRequest request, string updatedBy, string userRole)
+    {
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
+        if (c is null)
+            return ApiResponse<CaseDto>.FailResponse("Case not found.");
+
+        var newStatus = _workflowService.GetForwardStatus(userRole, request.TargetRole, c.Status);
+        if (newStatus is null)
+            return ApiResponse<CaseDto>.FailResponse($"Cannot forward case from role '{userRole}' to '{request.TargetRole}'.");
+
+        var oldStatus = c.Status;
+        c.Status = newStatus.Value;
+        c.ForwardedToRole = request.TargetRole;
+
+        if (!string.IsNullOrWhiteSpace(request.Recommendation))
+            c.Recommendation = request.Recommendation;
+
+        if (!string.IsNullOrWhiteSpace(request.Verdict))
+            c.Verdict = request.Verdict;
+
+        _unitOfWork.Cases.Update(c);
+
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = c.Id,
+            Action = "Case Forwarded",
+            Description = $"Case forwarded from {userRole} to {request.TargetRole}. Status changed from {oldStatus.ToKebabCase()} to {newStatus.Value.ToKebabCase()}.",
+            User = updatedBy
+        });
+
+        if (!string.IsNullOrWhiteSpace(request.Note))
+        {
+            _unitOfWork.Add(new Note
+            {
+                Id = Guid.NewGuid(),
+                CaseId = c.Id,
+                Content = request.Note,
+                Author = updatedBy
+            });
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.CreateAsync(null, request.TargetRole,
+            "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention.", c.Id);
+
+        var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
+        return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case forwarded successfully.");
+    }
+
+    public async Task<ApiResponse<ReportDto>> CreateReportAsync(Guid caseId, CreateReportRequest request, string createdByName, Guid createdById)
+    {
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
+        if (c is null)
+            return ApiResponse<ReportDto>.FailResponse("Case not found.");
+
+        var report = new Report
+        {
+            Id = Guid.NewGuid(),
+            CaseId = caseId,
+            Content = request.Content,
+            CreatedByName = createdByName,
+            CreatedById = createdById,
+            IsDraft = request.IsDraft
+        };
+
+        _unitOfWork.Add(report);
+
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = caseId,
+            Action = request.IsDraft ? "Draft Report Created" : "Report Submitted",
+            Description = $"{(request.IsDraft ? "Draft report" : "Report")} created by {createdByName}.",
+            User = createdByName
+        });
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<ReportDto>.SuccessResponse(report.ToDto(), "Report created successfully.");
+    }
+
+    public async Task<ApiResponse<List<ReportDto>>> GetReportsAsync(Guid caseId)
+    {
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
+        if (c is null)
+            return ApiResponse<List<ReportDto>>.FailResponse("Case not found.");
+
+        var reports = c.Reports.Select(r => r.ToDto()).ToList();
+        return ApiResponse<List<ReportDto>>.SuccessResponse(reports);
     }
 
     public async Task<ApiResponse<bool>> DeleteCaseAsync(Guid id)

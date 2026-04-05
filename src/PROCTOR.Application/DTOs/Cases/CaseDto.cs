@@ -1,6 +1,7 @@
 using PROCTOR.Application.DTOs.Documents;
 using PROCTOR.Application.DTOs.Hearings;
 using PROCTOR.Application.DTOs.Notes;
+using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.DTOs.Dashboard;
 
 namespace PROCTOR.Application.DTOs.Cases;
@@ -18,8 +19,12 @@ public class CaseDto
     public string CreatedDate { get; set; } = string.Empty;
     public string UpdatedDate { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string? Verdict { get; set; }
+    public string? Recommendation { get; set; }
+    public string? ForwardedToRole { get; set; }
     public List<DocumentDto> Documents { get; set; } = [];
     public List<NoteDto> Notes { get; set; } = [];
     public List<HearingDto> Hearings { get; set; } = [];
     public List<RecentActivityDto> Timeline { get; set; } = [];
+    public List<ReportDto> Reports { get; set; } = [];
 }

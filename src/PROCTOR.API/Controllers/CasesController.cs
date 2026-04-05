@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PROCTOR.Application.DTOs.Cases;
+using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.Interfaces;
 
 namespace PROCTOR.API.Controllers;
@@ -21,6 +22,12 @@ public class CasesController : ControllerBase
 
     private string GetCurrentUserName() =>
         User.FindFirst("name")?.Value ?? "Unknown";
+
+    private string GetCurrentUserRole() =>
+        User.FindFirst("role")?.Value ?? "";
+
+    private string GetCurrentUserId() =>
+        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
 
     [HttpGet]
     public async Task<IActionResult> GetCases(
@@ -70,14 +77,52 @@ public class CasesController : ControllerBase
     public async Task<IActionResult> UpdateCaseStatus(Guid id, [FromBody] UpdateCaseStatusRequest request)
     {
         var updatedBy = GetCurrentUserName();
-        var response = await _caseService.UpdateCaseStatusAsync(id, request, updatedBy);
+        var userRole = GetCurrentUserRole();
+        var response = await _caseService.UpdateCaseStatusAsync(id, request, updatedBy, userRole);
         if (!response.Success)
             return BadRequest(response);
 
         return Ok(response);
     }
 
+    [HttpPost("{id:guid}/forward")]
+    [Authorize(Roles = "coordinator,proctor,assistant-proctor,deputy-proctor,registrar,disciplinary-committee,female-coordinator,sexual-harassment-committee,super-admin")]
+    public async Task<IActionResult> ForwardCase(Guid id, [FromBody] ForwardCaseRequest request)
+    {
+        var updatedBy = GetCurrentUserName();
+        var userRole = GetCurrentUserRole();
+        var response = await _caseService.ForwardCaseAsync(id, request, updatedBy, userRole);
+        if (!response.Success)
+            return BadRequest(response);
+
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/reports")]
+    public async Task<IActionResult> CreateReport(Guid id, [FromBody] CreateReportRequest request)
+    {
+        var createdByName = GetCurrentUserName();
+        var userIdStr = GetCurrentUserId();
+        var createdById = Guid.TryParse(userIdStr, out var uid) ? uid : Guid.Empty;
+        var response = await _caseService.CreateReportAsync(id, request, createdByName, createdById);
+        if (!response.Success)
+            return BadRequest(response);
+
+        return Ok(response);
+    }
+
+    [HttpGet("{id:guid}/reports")]
+    public async Task<IActionResult> GetReports(Guid id)
+    {
+        var response = await _caseService.GetReportsAsync(id);
+        if (!response.Success)
+            return NotFound(response);
+
+        return Ok(response);
+    }
+
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "proctor,super-admin")]
     public async Task<IActionResult> DeleteCase(Guid id)
     {
         var response = await _caseService.DeleteCaseAsync(id);

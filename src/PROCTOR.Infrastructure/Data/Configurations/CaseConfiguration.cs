@@ -50,5 +50,14 @@ public class CaseConfiguration : IEntityTypeConfiguration<Case>
             .WithOne(te => te.Case)
             .HasForeignKey(te => te.CaseId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(c => c.Reports)
+            .WithOne(r => r.Case)
+            .HasForeignKey(r => r.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Property(c => c.Verdict).HasMaxLength(2000);
+        builder.Property(c => c.Recommendation).HasMaxLength(2000);
+        builder.Property(c => c.ForwardedToRole).HasMaxLength(50);
     }
 }

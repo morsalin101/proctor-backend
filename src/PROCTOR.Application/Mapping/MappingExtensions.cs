@@ -8,6 +8,7 @@ using PROCTOR.Application.DTOs.Documents;
 using PROCTOR.Application.DTOs.Hearings;
 using PROCTOR.Application.DTOs.Notes;
 using PROCTOR.Application.DTOs.Permissions;
+using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.DTOs.Users;
 
 namespace PROCTOR.Application.Mapping;
@@ -86,10 +87,14 @@ public static class MappingExtensions
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
         Description = c.Description,
+        Verdict = c.Verdict,
+        Recommendation = c.Recommendation,
+        ForwardedToRole = c.ForwardedToRole,
         Documents = c.Documents.Select(d => d.ToDto()).ToList(),
         Notes = c.Notes.Select(n => n.ToDto()).ToList(),
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
-        Timeline = c.TimelineEvents.Select(t => t.ToDto()).ToList()
+        Timeline = c.TimelineEvents.Select(t => t.ToDto()).ToList(),
+        Reports = c.Reports.Select(r => r.ToDto()).ToList()
     };
 
     public static CaseListDto ToListDto(this Case c) => new()
@@ -152,6 +157,16 @@ public static class MappingExtensions
         RoleName = r.RoleName.ToKebabCase(),
         DisplayName = r.DisplayName,
         MenuPermissions = r.MenuPermissions.Select(mp => mp.ToDto()).ToList()
+    };
+
+    public static ReportDto ToDto(this Report r) => new()
+    {
+        Id = r.Id.ToString(),
+        CaseId = r.CaseId.ToString(),
+        Content = r.Content,
+        CreatedByName = r.CreatedByName,
+        IsDraft = r.IsDraft,
+        CreatedDate = r.CreatedAt.ToString("o")
     };
 
     public static MenuPermissionDto ToDto(this MenuPermission mp) => new()

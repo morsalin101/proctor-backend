@@ -18,6 +18,7 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Hearings)
             .Include(c => c.TimelineEvents)
             .Include(c => c.AssignedTo)
+            .Include(c => c.Reports)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 

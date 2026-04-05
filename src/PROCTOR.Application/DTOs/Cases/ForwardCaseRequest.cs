@@ -1,9 +1,9 @@
 namespace PROCTOR.Application.DTOs.Cases;
 
-public class UpdateCaseStatusRequest
+public class ForwardCaseRequest
 {
-    public string Status { get; set; } = string.Empty;
+    public string TargetRole { get; set; } = string.Empty;
     public string? Note { get; set; }
-    public string? Verdict { get; set; }
     public string? Recommendation { get; set; }
+    public string? Verdict { get; set; }
 }

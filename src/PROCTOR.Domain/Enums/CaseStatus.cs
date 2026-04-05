@@ -13,5 +13,9 @@ public enum CaseStatus
     Closed,
     Rejected,
     OnHold,
-    SuggestedType2
+    SuggestedType2,
+    PoliceCase,
+    ForwardedToRegistrar,
+    ForwardedToCommittee,
+    ResubmissionRequested
 }
