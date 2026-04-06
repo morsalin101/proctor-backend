@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PROCTOR.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PROCTOR.Infrastructure.Data;
 namespace PROCTOR.Infrastructure.Migrations
 {
     [DbContext(typeof(ProctorDbContext))]
-    partial class ProctorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406142537_AddType2FieldsAndEnhancements")]
+    partial class AddType2FieldsAndEnhancements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -125,40 +128,6 @@ namespace PROCTOR.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Cases");
-                });
-
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseVerification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CaseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ChecklistResultsJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Comment")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CaseId");
-
-                    b.ToTable("CaseVerifications");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.Document", b =>
@@ -587,33 +556,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("PROCTOR.Domain.Entities.VerificationChecklistItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("VerificationChecklistItems");
-                });
-
             modelBuilder.Entity("PROCTOR.Domain.Entities.Case", b =>
                 {
                     b.HasOne("PROCTOR.Domain.Entities.User", "AssignedTo")
@@ -621,17 +563,6 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasForeignKey("AssignedToId");
 
                     b.Navigation("AssignedTo");
-                });
-
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseVerification", b =>
-                {
-                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
-                        .WithMany("Verifications")
-                        .HasForeignKey("CaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Case");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.Document", b =>
@@ -739,8 +670,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Navigation("Reports");
 
                     b.Navigation("TimelineEvents");
-
-                    b.Navigation("Verifications");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.Role", b =>

@@ -12,6 +12,7 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.Submitted, CaseStatus.Rejected), new() { "coordinator", "female-coordinator" } },
         { (CaseStatus.Submitted, CaseStatus.OnHold), new() { "coordinator", "female-coordinator" } },
         { (CaseStatus.Submitted, CaseStatus.ResubmissionRequested), new() { "coordinator", "female-coordinator" } },
+        { (CaseStatus.ResubmissionRequested, CaseStatus.Submitted), new() { "student" } },
         { (CaseStatus.ResubmissionRequested, CaseStatus.Verified), new() { "coordinator", "female-coordinator" } },
         { (CaseStatus.ResubmissionRequested, CaseStatus.Rejected), new() { "coordinator", "female-coordinator" } },
 
@@ -21,7 +22,7 @@ public class WorkflowService : IWorkflowService
         // Proctor actions
         { (CaseStatus.Assigned, CaseStatus.Resolved), new() { "proctor", "sexual-harassment-committee" } },
         { (CaseStatus.Assigned, CaseStatus.PoliceCase), new() { "proctor", "sexual-harassment-committee" } },
-        { (CaseStatus.Assigned, CaseStatus.ForwardedToRegistrar), new() { "proctor" } },
+        { (CaseStatus.Assigned, CaseStatus.ForwardedToRegistrar), new() { "proctor", "sexual-harassment-committee" } },
 
         // Assistant Proctor hearing workflow
         { (CaseStatus.Assigned, CaseStatus.HearingScheduled), new() { "assistant-proctor" } },
@@ -30,7 +31,6 @@ public class WorkflowService : IWorkflowService
         // Deputy Proctor actions
         { (CaseStatus.HearingCompleted, CaseStatus.Assigned), new() { "deputy-proctor" } },
         { (CaseStatus.HearingCompleted, CaseStatus.Resolved), new() { "deputy-proctor" } },
-        { (CaseStatus.HearingCompleted, CaseStatus.ForwardedToRegistrar), new() { "deputy-proctor" } },
 
         // Registrar actions
         { (CaseStatus.ForwardedToRegistrar, CaseStatus.ForwardedToCommittee), new() { "registrar" } },
@@ -83,7 +83,6 @@ public class WorkflowService : IWorkflowService
             // Deputy Proctor actions
             ("deputy-proctor", "assistant-proctor") => CaseStatus.Assigned,
             ("deputy-proctor", "proctor") => CaseStatus.Assigned,
-            ("deputy-proctor", "registrar") => CaseStatus.ForwardedToRegistrar,
 
             // Proctor forwards to registrar
             ("proctor", "registrar") => CaseStatus.ForwardedToRegistrar,
@@ -91,6 +90,10 @@ public class WorkflowService : IWorkflowService
             // Registrar actions
             ("registrar", "proctor") => CaseStatus.Assigned,
             ("registrar", "disciplinary-committee") => CaseStatus.ForwardedToCommittee,
+
+            // SH Committee assigns to subordinates (confidential cases)
+            ("sexual-harassment-committee", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
+            ("sexual-harassment-committee", "registrar") => CaseStatus.ForwardedToRegistrar,
 
             // Disciplinary Committee returns to proctor
             ("disciplinary-committee", "proctor") => CaseStatus.Assigned,

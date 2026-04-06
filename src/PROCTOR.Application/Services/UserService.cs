@@ -98,4 +98,12 @@ public class UserService : IUserService
 
         return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully.");
     }
+
+    public async Task<ApiResponse<List<UserDto>>> GetUsersByRoleAsync(string role)
+    {
+        var roleEnum = MappingExtensions.ParseEnum<UserRole>(role);
+        var users = await _unitOfWork.Users.FindAsync(u => u.Role == roleEnum && u.IsActive);
+        var dtos = users.Select(u => u.ToDto()).ToList();
+        return ApiResponse<List<UserDto>>.SuccessResponse(dtos);
+    }
 }

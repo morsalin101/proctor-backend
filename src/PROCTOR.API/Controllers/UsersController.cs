@@ -53,6 +53,13 @@ public class UsersController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("by-role/{role}")]
+    public async Task<IActionResult> GetUsersByRole(string role)
+    {
+        var response = await _userService.GetUsersByRoleAsync(role);
+        return Ok(response);
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {

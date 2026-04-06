@@ -52,7 +52,7 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(c.ToDto());
     }
 
-    public async Task<ApiResponse<CaseDto>> CreateCaseAsync(CreateCaseRequest request, string createdBy)
+    public async Task<ApiResponse<CaseDto>> CreateCaseAsync(CreateCaseRequest request, string createdBy, Guid? submittedByUserId = null)
     {
         var caseNumber = await _unitOfWork.Cases.GenerateCaseNumberAsync();
 
@@ -65,7 +65,21 @@ public class CaseService : ICaseService
             Type = MappingExtensions.ParseEnum<CaseType>(request.Type),
             Status = CaseStatus.Submitted,
             Priority = MappingExtensions.ParseEnum<Priority>(request.Priority),
-            Description = request.Description
+            Description = request.Description,
+            // Type-2 form fields
+            StudentDepartment = request.StudentDepartment,
+            StudentContact = request.StudentContact,
+            StudentAdvisorName = request.StudentAdvisorName,
+            StudentFatherName = request.StudentFatherName,
+            StudentFatherContact = request.StudentFatherContact,
+            AccusedName = request.AccusedName,
+            AccusedId = request.AccusedId,
+            AccusedDepartment = request.AccusedDepartment,
+            AccusedContact = request.AccusedContact,
+            AccusedGuardianContact = request.AccusedGuardianContact,
+            VideoLink = request.VideoLink,
+            IncidentDate = request.IncidentDate is not null ? DateTime.SpecifyKind(DateTime.Parse(request.IncidentDate), DateTimeKind.Utc) : null,
+            SubmittedByUserId = submittedByUserId
         };
 
         var timelineEvent = new TimelineEvent
@@ -110,6 +124,20 @@ public class CaseService : ICaseService
             c.AssignedToId = Guid.Parse(request.AssignedToId);
             c.Status = CaseStatus.Assigned;
         }
+
+        // Type-2 form fields update
+        if (request.StudentDepartment is not null) c.StudentDepartment = request.StudentDepartment;
+        if (request.StudentContact is not null) c.StudentContact = request.StudentContact;
+        if (request.StudentAdvisorName is not null) c.StudentAdvisorName = request.StudentAdvisorName;
+        if (request.StudentFatherName is not null) c.StudentFatherName = request.StudentFatherName;
+        if (request.StudentFatherContact is not null) c.StudentFatherContact = request.StudentFatherContact;
+        if (request.AccusedName is not null) c.AccusedName = request.AccusedName;
+        if (request.AccusedId is not null) c.AccusedId = request.AccusedId;
+        if (request.AccusedDepartment is not null) c.AccusedDepartment = request.AccusedDepartment;
+        if (request.AccusedContact is not null) c.AccusedContact = request.AccusedContact;
+        if (request.AccusedGuardianContact is not null) c.AccusedGuardianContact = request.AccusedGuardianContact;
+        if (request.VideoLink is not null) c.VideoLink = request.VideoLink;
+        if (request.IncidentDate is not null) c.IncidentDate = DateTime.Parse(request.IncidentDate).ToUniversalTime();
 
         _unitOfWork.Cases.Update(c);
 
@@ -179,17 +207,45 @@ public class CaseService : ICaseService
         await _unitOfWork.SaveChangesAsync();
 
         // Send role-appropriate notifications
-        var notifyRole = newStatus switch
+        if (newStatus == CaseStatus.ResubmissionRequested && c.SubmittedByUserId.HasValue)
         {
-            CaseStatus.Verified => "proctor",
-            CaseStatus.ForwardedToRegistrar => "registrar",
-            CaseStatus.ForwardedToCommittee => "disciplinary-committee",
-            CaseStatus.Resolved or CaseStatus.Closed => "proctor",
-            _ => "proctor"
-        };
+            // Notify the student who submitted the case
+            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, "student",
+                "Resubmission Requested", $"Case {c.CaseNumber} needs changes. Please review the coordinator comments and resubmit.", c.Id);
+        }
+        else if (newStatus == CaseStatus.Rejected && c.SubmittedByUserId.HasValue)
+        {
+            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, "student",
+                "Case Rejected", $"Case {c.CaseNumber} has been rejected.", c.Id);
+        }
+        else if (newStatus == CaseStatus.Submitted)
+        {
+            // Notify coordinator when student resubmits
+            var targetRole = c.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
+            await _notificationService.CreateAsync(null, targetRole,
+                "Case Resubmitted", $"Case {c.CaseNumber} has been resubmitted by {c.StudentName}.", c.Id);
+        }
+        else
+        {
+            var notifyRole = newStatus switch
+            {
+                CaseStatus.Verified => "proctor",
+                CaseStatus.ForwardedToRegistrar => "registrar",
+                CaseStatus.ForwardedToCommittee => "disciplinary-committee",
+                CaseStatus.Resolved or CaseStatus.Closed => "proctor",
+                _ => "proctor"
+            };
 
-        await _notificationService.CreateAsync(null, notifyRole,
-            "Case Status Updated", $"Case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
+            await _notificationService.CreateAsync(null, notifyRole,
+                "Case Status Updated", $"Case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
+        }
+
+        // Also notify the student on every status change
+        if (newStatus != CaseStatus.ResubmissionRequested && newStatus != CaseStatus.Rejected && newStatus != CaseStatus.Submitted && c.SubmittedByUserId.HasValue)
+        {
+            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
+                "Case Update", $"Your case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
+        }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case status updated successfully.");
@@ -208,6 +264,10 @@ public class CaseService : ICaseService
         var oldStatus = c.Status;
         c.Status = newStatus.Value;
         c.ForwardedToRole = request.TargetRole;
+
+        // Individual assignment
+        if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var assigneeId))
+            c.AssignedToId = assigneeId;
 
         if (!string.IsNullOrWhiteSpace(request.Recommendation))
             c.Recommendation = request.Recommendation;
@@ -239,8 +299,16 @@ public class CaseService : ICaseService
 
         await _unitOfWork.SaveChangesAsync();
 
+        // Always notify the target role so all users of that role see it
         await _notificationService.CreateAsync(null, request.TargetRole,
-            "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention.", c.Id);
+            "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);
+
+        // Additionally notify the specific assigned user if individually assigned
+        if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var notifyUserId))
+        {
+            await _notificationService.CreateAsync(notifyUserId, null,
+                "Case Assigned to You", $"Case {c.CaseNumber} has been specifically assigned to you.", c.Id);
+        }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case forwarded successfully.");
@@ -259,7 +327,8 @@ public class CaseService : ICaseService
             Content = request.Content,
             CreatedByName = createdByName,
             CreatedById = createdById,
-            IsDraft = request.IsDraft
+            IsDraft = request.IsDraft,
+            IsFinal = request.IsFinal
         };
 
         _unitOfWork.Add(report);
@@ -298,5 +367,36 @@ public class CaseService : ICaseService
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Case deleted successfully.");
+    }
+
+    public async Task<ApiResponse<PagedResult<CaseListDto>>> GetMyCasesAsync(Guid userId, string userRole, int page, int pageSize)
+    {
+        var allCases = await _unitOfWork.Cases.FindAsync(c =>
+            c.ForwardedToRole == userRole || c.AssignedToId == userId || c.SubmittedByUserId == userId);
+
+        var totalCount = allCases.Count();
+        var items = allCases
+            .OrderByDescending(c => c.UpdatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => c.ToListDto());
+
+        var result = new PagedResult<CaseListDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+
+        return ApiResponse<PagedResult<CaseListDto>>.SuccessResponse(result);
+    }
+
+    public async Task<ApiResponse<int>> GetMyCasesCountAsync(Guid userId, string userRole)
+    {
+        var count = await _unitOfWork.Cases.CountAsync(c =>
+            c.ForwardedToRole == userRole || c.AssignedToId == userId || c.SubmittedByUserId == userId);
+
+        return ApiResponse<int>.SuccessResponse(count);
     }
 }

@@ -7,5 +7,6 @@ public class DocumentDto
     public string Type { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
     public string UploadedBy { get; set; } = string.Empty;
+    public string? UploadedByRole { get; set; }
     public string UploadedDate { get; set; } = string.Empty;
 }

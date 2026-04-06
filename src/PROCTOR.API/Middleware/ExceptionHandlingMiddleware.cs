@@ -27,7 +27,8 @@ public class ExceptionHandlingMiddleware
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-            var response = ApiResponse<object>.FailResponse(ex.Message);
+            var errorMessage = ex.InnerException?.Message ?? ex.Message;
+            var response = ApiResponse<object>.FailResponse(errorMessage);
             var json = JsonSerializer.Serialize(response, new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase

@@ -10,4 +10,5 @@ public interface IUserService
     Task<ApiResponse<UserDto>> CreateUserAsync(CreateUserRequest request);
     Task<ApiResponse<UserDto>> UpdateUserAsync(Guid id, UpdateUserRequest request);
     Task<ApiResponse<bool>> DeleteUserAsync(Guid id);
+    Task<ApiResponse<List<UserDto>>> GetUsersByRoleAsync(string role);
 }

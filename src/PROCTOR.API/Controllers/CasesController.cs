@@ -14,10 +14,12 @@ namespace PROCTOR.API.Controllers;
 public class CasesController : ControllerBase
 {
     private readonly ICaseService _caseService;
+    private readonly IPermissionChecker _permissionChecker;
 
-    public CasesController(ICaseService caseService)
+    public CasesController(ICaseService caseService, IPermissionChecker permissionChecker)
     {
         _caseService = caseService;
+        _permissionChecker = permissionChecker;
     }
 
     private string GetCurrentUserName() =>
@@ -56,7 +58,9 @@ public class CasesController : ControllerBase
     public async Task<IActionResult> CreateCase([FromBody] CreateCaseRequest request)
     {
         var createdBy = GetCurrentUserName();
-        var response = await _caseService.CreateCaseAsync(request, createdBy);
+        var userIdStr = GetCurrentUserId();
+        var submittedByUserId = Guid.TryParse(userIdStr, out var uid) ? uid : (Guid?)null;
+        var response = await _caseService.CreateCaseAsync(request, createdBy, submittedByUserId);
         if (!response.Success)
             return BadRequest(response);
 
@@ -121,10 +125,34 @@ public class CasesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("my-cases")]
+    public async Task<IActionResult> GetMyCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        var userIdStr = GetCurrentUserId();
+        var userId = Guid.TryParse(userIdStr, out var uid) ? uid : Guid.Empty;
+        var userRole = GetCurrentUserRole();
+        var response = await _caseService.GetMyCasesAsync(userId, userRole, page, pageSize);
+        return Ok(response);
+    }
+
+    [HttpGet("my-cases/count")]
+    public async Task<IActionResult> GetMyCasesCount()
+    {
+        var userIdStr = GetCurrentUserId();
+        var userId = Guid.TryParse(userIdStr, out var uid) ? uid : Guid.Empty;
+        var userRole = GetCurrentUserRole();
+        var response = await _caseService.GetMyCasesCountAsync(userId, userRole);
+        return Ok(response);
+    }
+
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "proctor,super-admin")]
     public async Task<IActionResult> DeleteCase(Guid id)
     {
+        var userRole = GetCurrentUserRole();
+        var canDelete = await _permissionChecker.HasPermissionAsync(userRole, "cases", "delete");
+        if (!canDelete)
+            return Forbid();
+
         var response = await _caseService.DeleteCaseAsync(id);
         if (!response.Success)
             return NotFound(response);

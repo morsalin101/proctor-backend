@@ -13,4 +13,5 @@ public class CaseListDto
     public string CreatedDate { get; set; } = string.Empty;
     public string UpdatedDate { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string? ForwardedToRole { get; set; }
 }

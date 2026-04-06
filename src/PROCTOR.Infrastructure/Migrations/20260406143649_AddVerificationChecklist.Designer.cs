@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PROCTOR.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PROCTOR.Infrastructure.Data;
 namespace PROCTOR.Infrastructure.Migrations
 {
     [DbContext(typeof(ProctorDbContext))]
-    partial class ProctorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406143649_AddVerificationChecklist")]
+    partial class AddVerificationChecklist
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

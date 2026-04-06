@@ -19,6 +19,8 @@ public class ProctorDbContext : DbContext
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<VerificationChecklistItem> VerificationChecklistItems => Set<VerificationChecklistItem>();
+    public DbSet<CaseVerification> CaseVerifications => Set<CaseVerification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

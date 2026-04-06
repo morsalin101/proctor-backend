@@ -22,6 +22,21 @@ public class CaseDto
     public string? Verdict { get; set; }
     public string? Recommendation { get; set; }
     public string? ForwardedToRole { get; set; }
+
+    // Type-2 form fields
+    public string? StudentDepartment { get; set; }
+    public string? StudentContact { get; set; }
+    public string? StudentAdvisorName { get; set; }
+    public string? StudentFatherName { get; set; }
+    public string? StudentFatherContact { get; set; }
+    public string? AccusedName { get; set; }
+    public string? AccusedId { get; set; }
+    public string? AccusedDepartment { get; set; }
+    public string? AccusedContact { get; set; }
+    public string? AccusedGuardianContact { get; set; }
+    public string? VideoLink { get; set; }
+    public string? IncidentDate { get; set; }
+
     public List<DocumentDto> Documents { get; set; } = [];
     public List<NoteDto> Notes { get; set; } = [];
     public List<HearingDto> Hearings { get; set; } = [];

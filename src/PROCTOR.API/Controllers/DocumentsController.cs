@@ -26,6 +26,9 @@ public class DocumentsController : ControllerBase
     private string GetCurrentUserName() =>
         User.FindFirst("name")?.Value ?? "Unknown";
 
+    private string GetCurrentUserRole() =>
+        User.FindFirst("role")?.Value ?? "";
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(50 * 1024 * 1024)] // 50MB
@@ -70,6 +73,7 @@ public class DocumentsController : ControllerBase
             Type = documentType,
             Url = relativeUrl,
             UploadedBy = uploadedBy,
+            UploadedByRole = GetCurrentUserRole(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -96,6 +100,7 @@ public class DocumentsController : ControllerBase
             Type = document.Type.ToString().ToLower(),
             Url = document.Url,
             UploadedBy = document.UploadedBy,
+            UploadedByRole = document.UploadedByRole,
             UploadedDate = document.CreatedAt.ToString("o")
         };
 

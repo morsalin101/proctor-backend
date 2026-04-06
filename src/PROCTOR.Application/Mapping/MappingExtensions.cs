@@ -90,6 +90,18 @@ public static class MappingExtensions
         Verdict = c.Verdict,
         Recommendation = c.Recommendation,
         ForwardedToRole = c.ForwardedToRole,
+        StudentDepartment = c.StudentDepartment,
+        StudentContact = c.StudentContact,
+        StudentAdvisorName = c.StudentAdvisorName,
+        StudentFatherName = c.StudentFatherName,
+        StudentFatherContact = c.StudentFatherContact,
+        AccusedName = c.AccusedName,
+        AccusedId = c.AccusedId,
+        AccusedDepartment = c.AccusedDepartment,
+        AccusedContact = c.AccusedContact,
+        AccusedGuardianContact = c.AccusedGuardianContact,
+        VideoLink = c.VideoLink,
+        IncidentDate = c.IncidentDate?.ToString("o"),
         Documents = c.Documents.Select(d => d.ToDto()).ToList(),
         Notes = c.Notes.Select(n => n.ToDto()).ToList(),
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
@@ -109,7 +121,8 @@ public static class MappingExtensions
         AssignedTo = c.AssignedTo?.Name,
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
-        Description = c.Description
+        Description = c.Description,
+        ForwardedToRole = c.ForwardedToRole
     };
 
     public static DocumentDto ToDto(this Document d) => new()
@@ -119,6 +132,7 @@ public static class MappingExtensions
         Type = d.Type.ToKebabCase(),
         Url = d.Url,
         UploadedBy = d.UploadedBy,
+        UploadedByRole = d.UploadedByRole,
         UploadedDate = d.CreatedAt.ToString("o")
     };
 
@@ -166,6 +180,7 @@ public static class MappingExtensions
         Content = r.Content,
         CreatedByName = r.CreatedByName,
         IsDraft = r.IsDraft,
+        IsFinal = r.IsFinal,
         CreatedDate = r.CreatedAt.ToString("o")
     };
 

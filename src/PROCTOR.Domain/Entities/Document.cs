@@ -9,6 +9,7 @@ public class Document : BaseEntity
     public DocumentType Type { get; set; }
     public string Url { get; set; } = string.Empty;
     public string UploadedBy { get; set; } = string.Empty;
+    public string? UploadedByRole { get; set; }
 
     public Case Case { get; set; } = null!;
 }

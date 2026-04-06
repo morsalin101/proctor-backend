@@ -52,9 +52,21 @@ public class CaseRepository : Repository<Case>, ICaseRepository
     public async Task<string> GenerateCaseNumberAsync()
     {
         var year = DateTime.UtcNow.Year;
-        var count = await _dbSet.CountAsync(c => c.CaseNumber.StartsWith($"CASE-{year}-"));
-        var sequence = count + 1;
-        return $"CASE-{year}-{sequence:D3}";
+        var prefix = $"CASE-{year}-";
+        var lastCase = await _dbSet
+            .Where(c => c.CaseNumber.StartsWith(prefix))
+            .OrderByDescending(c => c.CaseNumber)
+            .FirstOrDefaultAsync();
+
+        var sequence = 1;
+        if (lastCase is not null)
+        {
+            var lastNum = lastCase.CaseNumber.Replace(prefix, "");
+            if (int.TryParse(lastNum, out var parsed))
+                sequence = parsed + 1;
+        }
+
+        return $"{prefix}{sequence:D3}";
     }
 
     private IQueryable<Case> ApplyFilters(

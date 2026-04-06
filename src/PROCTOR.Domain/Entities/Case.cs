@@ -15,6 +15,21 @@ public class Case : BaseEntity
     public string? Verdict { get; set; }
     public string? Recommendation { get; set; }
     public string? ForwardedToRole { get; set; }
+    public Guid? SubmittedByUserId { get; set; }
+
+    // Type-2 form fields
+    public string? StudentDepartment { get; set; }
+    public string? StudentContact { get; set; }
+    public string? StudentAdvisorName { get; set; }
+    public string? StudentFatherName { get; set; }
+    public string? StudentFatherContact { get; set; }
+    public string? AccusedName { get; set; }
+    public string? AccusedId { get; set; }
+    public string? AccusedDepartment { get; set; }
+    public string? AccusedContact { get; set; }
+    public string? AccusedGuardianContact { get; set; }
+    public string? VideoLink { get; set; }
+    public DateTime? IncidentDate { get; set; }
 
     public User? AssignedTo { get; set; }
     public ICollection<Document> Documents { get; set; } = new List<Document>();
@@ -22,4 +37,5 @@ public class Case : BaseEntity
     public ICollection<Hearing> Hearings { get; set; } = new List<Hearing>();
     public ICollection<TimelineEvent> TimelineEvents { get; set; } = new List<TimelineEvent>();
     public ICollection<Report> Reports { get; set; } = new List<Report>();
+    public ICollection<CaseVerification> Verifications { get; set; } = new List<CaseVerification>();
 }
