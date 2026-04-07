@@ -17,6 +17,9 @@ public class ArticleService : IArticleService
         _unitOfWork = unitOfWork;
     }
 
+    private static string Sanitize(string? input) =>
+        input?.Replace("\0", string.Empty).Trim() ?? string.Empty;
+
     public async Task<ApiResponse<List<ArticleDto>>> GetAllAsync()
     {
         var articles = await _repository.GetAllAsync();
@@ -37,9 +40,9 @@ public class ArticleService : IArticleService
         var article = new Article
         {
             Id = Guid.NewGuid(),
-            ArticleNo = request.ArticleNo,
-            Title = request.Title,
-            Description = request.Description,
+            ArticleNo = Sanitize(request.ArticleNo),
+            Title = Sanitize(request.Title),
+            Description = Sanitize(request.Description),
             Order = request.Order
         };
         await _repository.AddAsync(article);
@@ -55,9 +58,9 @@ public class ArticleService : IArticleService
     {
         var article = await _repository.GetByIdAsync(id);
         if (article is null) return ApiResponse<ArticleDto>.FailResponse("Article not found.");
-        if (request.ArticleNo is not null) article.ArticleNo = request.ArticleNo;
-        if (request.Title is not null) article.Title = request.Title;
-        if (request.Description is not null) article.Description = request.Description;
+        if (request.ArticleNo is not null) article.ArticleNo = Sanitize(request.ArticleNo);
+        if (request.Title is not null) article.Title = Sanitize(request.Title);
+        if (request.Description is not null) article.Description = Sanitize(request.Description);
         if (request.Order.HasValue) article.Order = request.Order.Value;
         if (request.IsActive.HasValue) article.IsActive = request.IsActive.Value;
         article.UpdatedAt = DateTime.UtcNow;
