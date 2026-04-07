@@ -7,4 +7,5 @@ public class UserDto
     public string Email { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public string? Avatar { get; set; }
+    public string? Rank { get; set; }
 }

@@ -21,4 +21,8 @@ public class CreateCaseRequest
     public string? AccusedGuardianContact { get; set; }
     public string? VideoLink { get; set; }
     public string? IncidentDate { get; set; }
+
+    // Multiple complainants/accused
+    public List<CreateCaseComplainantRequest>? Complainants { get; set; }
+    public List<CreateCaseAccusedRequest>? AccusedPersons { get; set; }
 }

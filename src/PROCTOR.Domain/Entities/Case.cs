@@ -38,4 +38,6 @@ public class Case : BaseEntity
     public ICollection<TimelineEvent> TimelineEvents { get; set; } = new List<TimelineEvent>();
     public ICollection<Report> Reports { get; set; } = new List<Report>();
     public ICollection<CaseVerification> Verifications { get; set; } = new List<CaseVerification>();
+    public ICollection<CaseComplainant> Complainants { get; set; } = new List<CaseComplainant>();
+    public ICollection<CaseAccused> AccusedPersons { get; set; } = new List<CaseAccused>();
 }

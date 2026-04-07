@@ -21,6 +21,11 @@ public class ProctorDbContext : DbContext
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<VerificationChecklistItem> VerificationChecklistItems => Set<VerificationChecklistItem>();
     public DbSet<CaseVerification> CaseVerifications => Set<CaseVerification>();
+    public DbSet<Article> Articles => Set<Article>();
+    public DbSet<Rank> Ranks => Set<Rank>();
+    public DbSet<CaseComplainant> CaseComplainants => Set<CaseComplainant>();
+    public DbSet<CaseAccused> CaseAccusedPersons => Set<CaseAccused>();
+    public DbSet<ForwardingRule> ForwardingRules => Set<ForwardingRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

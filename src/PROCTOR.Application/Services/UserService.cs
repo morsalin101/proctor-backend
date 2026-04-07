@@ -48,7 +48,8 @@ public class UserService : IUserService
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = role,
-            IsActive = true
+            IsActive = true,
+            RankName = request.Rank
         };
 
         await _unitOfWork.Users.AddAsync(user);
@@ -77,6 +78,9 @@ public class UserService : IUserService
 
         if (request.IsActive.HasValue)
             user.IsActive = request.IsActive.Value;
+
+        if (request.Rank is not null)
+            user.RankName = request.Rank;
 
         user.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.Users.Update(user);

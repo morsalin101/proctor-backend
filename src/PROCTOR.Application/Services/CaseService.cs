@@ -93,6 +93,36 @@ public class CaseService : ICaseService
 
         newCase.TimelineEvents.Add(timelineEvent);
 
+        // Add multiple complainants
+        if (request.Complainants?.Count > 0)
+        {
+            var order = 0;
+            foreach (var c in request.Complainants)
+            {
+                newCase.Complainants.Add(new CaseComplainant
+                {
+                    Id = Guid.NewGuid(), CaseId = newCase.Id, Name = c.Name, StudentId = c.StudentId,
+                    Department = c.Department, Contact = c.Contact, AdvisorName = c.AdvisorName,
+                    FatherName = c.FatherName, FatherContact = c.FatherContact, Order = order++
+                });
+            }
+        }
+
+        // Add multiple accused persons
+        if (request.AccusedPersons?.Count > 0)
+        {
+            var order = 0;
+            foreach (var a in request.AccusedPersons)
+            {
+                newCase.AccusedPersons.Add(new CaseAccused
+                {
+                    Id = Guid.NewGuid(), CaseId = newCase.Id, Name = a.Name,
+                    AccusedStudentId = a.AccusedStudentId, Department = a.Department,
+                    Contact = a.Contact, GuardianContact = a.GuardianContact, Order = order++
+                });
+            }
+        }
+
         await _unitOfWork.Cases.AddAsync(newCase);
         await _unitOfWork.SaveChangesAsync();
 
@@ -257,7 +287,7 @@ public class CaseService : ICaseService
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
 
-        var newStatus = _workflowService.GetForwardStatus(userRole, request.TargetRole, c.Status);
+        var newStatus = await _workflowService.GetForwardStatusAsync(userRole, request.TargetRole, c.Status);
         if (newStatus is null)
             return ApiResponse<CaseDto>.FailResponse($"Cannot forward case from role '{userRole}' to '{request.TargetRole}'.");
 
@@ -328,7 +358,8 @@ public class CaseService : ICaseService
             CreatedByName = createdByName,
             CreatedById = createdById,
             IsDraft = request.IsDraft,
-            IsFinal = request.IsFinal
+            IsFinal = request.IsFinal,
+            SectionsJson = request.SectionsJson
         };
 
         _unitOfWork.Add(report);
@@ -355,6 +386,23 @@ public class CaseService : ICaseService
 
         var reports = c.Reports.Select(r => r.ToDto()).ToList();
         return ApiResponse<List<ReportDto>>.SuccessResponse(reports);
+    }
+
+    public async Task<ApiResponse<ReportDto>> UpdateReportAsync(Guid caseId, Guid reportId, CreateReportRequest request, string updatedByName)
+    {
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
+        if (c is null) return ApiResponse<ReportDto>.FailResponse("Case not found.");
+        var report = c.Reports.FirstOrDefault(r => r.Id == reportId);
+        if (report is null) return ApiResponse<ReportDto>.FailResponse("Report not found.");
+
+        report.Content = request.Content;
+        report.IsDraft = request.IsDraft;
+        report.IsFinal = request.IsFinal;
+        report.SectionsJson = request.SectionsJson;
+        report.UpdatedAt = DateTime.UtcNow;
+
+        await _unitOfWork.SaveChangesAsync();
+        return ApiResponse<ReportDto>.SuccessResponse(report.ToDto(), "Report updated.");
     }
 
     public async Task<ApiResponse<bool>> DeleteCaseAsync(Guid id)

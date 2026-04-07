@@ -19,6 +19,8 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.TimelineEvents)
             .Include(c => c.AssignedTo)
             .Include(c => c.Reports)
+            .Include(c => c.Complainants)
+            .Include(c => c.AccusedPersons)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 

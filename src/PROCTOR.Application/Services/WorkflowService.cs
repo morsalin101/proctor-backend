@@ -1,10 +1,20 @@
 using PROCTOR.Application.Interfaces;
+using PROCTOR.Application.Mapping;
+using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
+using PROCTOR.Domain.Interfaces;
 
 namespace PROCTOR.Application.Services;
 
 public class WorkflowService : IWorkflowService
 {
+    private readonly IRepository<ForwardingRule> _forwardingRuleRepository;
+
+    public WorkflowService(IRepository<ForwardingRule> forwardingRuleRepository)
+    {
+        _forwardingRuleRepository = forwardingRuleRepository;
+    }
+
     private static readonly Dictionary<(CaseStatus From, CaseStatus To), HashSet<string>> Transitions = new()
     {
         // Coordinator / Female Coordinator verification
@@ -56,48 +66,47 @@ public class WorkflowService : IWorkflowService
 
     public bool ValidateTransition(CaseStatus from, CaseStatus to, string userRole)
     {
-        // Super admin can do anything
-        if (userRole == "super-admin")
-            return true;
-
+        if (userRole == "super-admin") return true;
         if (Transitions.TryGetValue((from, to), out var allowedRoles))
             return allowedRoles.Contains(userRole);
-
         return false;
     }
 
-    public CaseStatus? GetForwardStatus(string fromRole, string toRole, CaseStatus currentStatus)
+    public async Task<CaseStatus?> GetForwardStatusAsync(string fromRole, string toRole, CaseStatus currentStatus)
     {
+        // Check DB-configured forwarding rules first
+        var rules = await _forwardingRuleRepository.FindAsync(
+            r => r.FromRole == fromRole && r.ToRole == toRole && r.IsActive);
+        var rule = rules.FirstOrDefault();
+
+        if (rule is not null && !string.IsNullOrWhiteSpace(rule.ResultStatus))
+        {
+            try
+            {
+                return MappingExtensions.ParseEnum<CaseStatus>(rule.ResultStatus);
+            }
+            catch { /* fall through to hardcoded defaults */ }
+        }
+
+        // If rule exists but has no explicit status, use "assigned" as default for forwarding
+        if (rule is not null)
+            return CaseStatus.Assigned;
+
+        // Fallback: hardcoded defaults (kept for backward compat until all rules are migrated)
         return (fromRole, toRole) switch
         {
-            // Coordinator forwards to proctor after verification
             ("coordinator" or "female-coordinator", "proctor") => CaseStatus.Assigned,
             ("coordinator" or "female-coordinator", "sexual-harassment-committee") => CaseStatus.Assigned,
-
-            // Proctor assigns to subordinates
             ("proctor", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
-
-            // Assistant Proctor forwards to Deputy
             ("assistant-proctor", "deputy-proctor") => currentStatus,
-
-            // Deputy Proctor actions
             ("deputy-proctor", "assistant-proctor") => CaseStatus.Assigned,
             ("deputy-proctor", "proctor") => CaseStatus.Assigned,
-
-            // Proctor forwards to registrar
             ("proctor", "registrar") => CaseStatus.ForwardedToRegistrar,
-
-            // Registrar actions
             ("registrar", "proctor") => CaseStatus.Assigned,
             ("registrar", "disciplinary-committee") => CaseStatus.ForwardedToCommittee,
-
-            // SH Committee assigns to subordinates (confidential cases)
             ("sexual-harassment-committee", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
             ("sexual-harassment-committee", "registrar") => CaseStatus.ForwardedToRegistrar,
-
-            // Disciplinary Committee returns to proctor
             ("disciplinary-committee", "proctor") => CaseStatus.Assigned,
-
             _ => null
         };
     }

@@ -10,5 +10,6 @@ public static class DbSeeder
         await UserSeeder.SeedAsync(context);
         await MenuPermissionSeeder.SeedAsync(context);
         await SystemSettingSeeder.SeedAsync(context);
+        await ForwardingRuleSeeder.SeedAsync(context);
     }
 }

@@ -8,6 +8,7 @@ public class Report : BaseEntity
     public Guid CreatedById { get; set; }
     public bool IsDraft { get; set; } = true;
     public bool IsFinal { get; set; }
+    public string? SectionsJson { get; set; }
 
     public Case Case { get; set; } = null!;
 }

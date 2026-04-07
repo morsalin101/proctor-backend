@@ -115,6 +115,15 @@ public class CasesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPut("{caseId:guid}/reports/{reportId:guid}")]
+    public async Task<IActionResult> UpdateReport(Guid caseId, Guid reportId, [FromBody] CreateReportRequest request)
+    {
+        var createdByName = GetCurrentUserName();
+        var response = await _caseService.UpdateReportAsync(caseId, reportId, request, createdByName);
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
+
     [HttpGet("{id:guid}/reports")]
     public async Task<IActionResult> GetReports(Guid id)
     {

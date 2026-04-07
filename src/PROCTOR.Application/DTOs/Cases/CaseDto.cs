@@ -37,6 +37,8 @@ public class CaseDto
     public string? VideoLink { get; set; }
     public string? IncidentDate { get; set; }
 
+    public List<CaseComplainantDto> Complainants { get; set; } = [];
+    public List<CaseAccusedDto> AccusedPersons { get; set; } = [];
     public List<DocumentDto> Documents { get; set; } = [];
     public List<NoteDto> Notes { get; set; } = [];
     public List<HearingDto> Hearings { get; set; } = [];

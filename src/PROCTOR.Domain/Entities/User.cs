@@ -10,6 +10,7 @@ public class User : BaseEntity
     public UserRole Role { get; set; }
     public string? Avatar { get; set; }
     public bool IsActive { get; set; } = true;
+    public string? RankName { get; set; }
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

@@ -18,6 +18,9 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IWorkflowService, WorkflowService>();
         services.AddScoped<IPermissionChecker, PermissionChecker>();
+        services.AddScoped<IArticleService, ArticleService>();
+        services.AddScoped<IRankService, RankService>();
+        services.AddScoped<IForwardingRuleService, ForwardingRuleService>();
 
         return services;
     }

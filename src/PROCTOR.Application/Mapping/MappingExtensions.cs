@@ -10,6 +10,8 @@ using PROCTOR.Application.DTOs.Notes;
 using PROCTOR.Application.DTOs.Permissions;
 using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.DTOs.Users;
+using PROCTOR.Application.DTOs.Articles;
+using PROCTOR.Application.DTOs.Ranks;
 
 namespace PROCTOR.Application.Mapping;
 
@@ -71,7 +73,8 @@ public static class MappingExtensions
         Name = user.Name,
         Email = user.Email,
         Role = user.Role.ToKebabCase(),
-        Avatar = user.Avatar
+        Avatar = user.Avatar,
+        Rank = user.RankName
     };
 
     public static CaseDto ToDto(this Case c) => new()
@@ -102,6 +105,8 @@ public static class MappingExtensions
         AccusedGuardianContact = c.AccusedGuardianContact,
         VideoLink = c.VideoLink,
         IncidentDate = c.IncidentDate?.ToString("o"),
+        Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
+        AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
         Documents = c.Documents.Select(d => d.ToDto()).ToList(),
         Notes = c.Notes.Select(n => n.ToDto()).ToList(),
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
@@ -181,7 +186,8 @@ public static class MappingExtensions
         CreatedByName = r.CreatedByName,
         IsDraft = r.IsDraft,
         IsFinal = r.IsFinal,
-        CreatedDate = r.CreatedAt.ToString("o")
+        CreatedDate = r.CreatedAt.ToString("o"),
+        SectionsJson = r.SectionsJson
     };
 
     public static MenuPermissionDto ToDto(this MenuPermission mp) => new()
@@ -192,5 +198,18 @@ public static class MappingExtensions
         CanRead = mp.CanRead,
         CanUpdate = mp.CanUpdate,
         CanDelete = mp.CanDelete
+    };
+
+    public static CaseComplainantDto ToDto(this CaseComplainant c) => new()
+    {
+        Id = c.Id.ToString(), Name = c.Name, StudentId = c.StudentId,
+        Department = c.Department, Contact = c.Contact, AdvisorName = c.AdvisorName,
+        FatherName = c.FatherName, FatherContact = c.FatherContact
+    };
+
+    public static CaseAccusedDto ToDto(this CaseAccused a) => new()
+    {
+        Id = a.Id.ToString(), Name = a.Name, AccusedStudentId = a.AccusedStudentId,
+        Department = a.Department, Contact = a.Contact, GuardianContact = a.GuardianContact
     };
 }

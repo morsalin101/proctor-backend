@@ -9,7 +9,8 @@ public static class MenuPermissionSeeder
     private static readonly string[] AllMenuKeys =
     {
         "dashboard", "submit", "incidents", "cases", "hearings",
-        "confidential", "monitoring", "reports", "users", "settings"
+        "confidential", "monitoring", "reports", "users", "settings",
+        "my-cases", "notifications"
     };
 
     public static async Task SeedAsync(ProctorDbContext context)

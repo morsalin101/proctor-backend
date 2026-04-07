@@ -9,4 +9,5 @@ public class ReportDto
     public bool IsDraft { get; set; }
     public bool IsFinal { get; set; }
     public string CreatedDate { get; set; } = string.Empty;
+    public string? SectionsJson { get; set; }
 }
