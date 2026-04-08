@@ -33,4 +33,36 @@ public static class ForwardingRuleSeeder
         await context.ForwardingRules.AddRangeAsync(rules);
         await context.SaveChangesAsync();
     }
+
+    // Seed __close__ and __hearing__ special rules (runs even if forwarding rules exist)
+    public static async Task SeedSpecialRulesAsync(ProctorDbContext context)
+    {
+        var hasClose = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__close__");
+        if (!hasClose)
+        {
+            var closeRules = new List<ForwardingRule>
+            {
+                new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "__close__", ResultStatus = "closed" },
+                new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "__close__", ResultStatus = "closed" },
+                new() { Id = Guid.NewGuid(), FromRole = "disciplinary-committee", ToRole = "__close__", ResultStatus = "closed" },
+                new() { Id = Guid.NewGuid(), FromRole = "super-admin", ToRole = "__close__", ResultStatus = "closed" },
+            };
+            await context.ForwardingRules.AddRangeAsync(closeRules);
+        }
+
+        var hasHearing = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__hearing__");
+        if (!hasHearing)
+        {
+            var hearingRules = new List<ForwardingRule>
+            {
+                new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "__hearing__", ResultStatus = "hearing-scheduled" },
+                new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "__hearing__", ResultStatus = "hearing-scheduled" },
+                new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "__hearing__", ResultStatus = "hearing-scheduled" },
+                new() { Id = Guid.NewGuid(), FromRole = "disciplinary-committee", ToRole = "__hearing__", ResultStatus = "hearing-scheduled" },
+            };
+            await context.ForwardingRules.AddRangeAsync(hearingRules);
+        }
+
+        await context.SaveChangesAsync();
+    }
 }

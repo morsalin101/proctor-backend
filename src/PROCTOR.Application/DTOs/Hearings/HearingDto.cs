@@ -10,4 +10,5 @@ public class HearingDto
     public List<string> Participants { get; set; } = [];
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }
+    public string? Remarks { get; set; }
 }

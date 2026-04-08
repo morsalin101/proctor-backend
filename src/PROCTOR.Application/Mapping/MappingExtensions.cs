@@ -158,7 +158,8 @@ public static class MappingExtensions
         Location = h.Location,
         Participants = h.Participants,
         Status = h.Status.ToKebabCase(),
-        Notes = h.Notes
+        Notes = h.Notes,
+        Remarks = h.Remarks
     };
 
     public static RecentActivityDto ToDto(this TimelineEvent t) => new()

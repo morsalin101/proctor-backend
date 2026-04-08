@@ -64,11 +64,30 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.OnHold, CaseStatus.Verified), new() { "coordinator", "female-coordinator" } },
     };
 
-    public bool ValidateTransition(CaseStatus from, CaseStatus to, string userRole)
+    public async Task<bool> ValidateTransitionAsync(CaseStatus from, CaseStatus to, string userRole)
     {
         if (userRole == "super-admin") return true;
-        if (Transitions.TryGetValue((from, to), out var allowedRoles))
-            return allowedRoles.Contains(userRole);
+
+        // Check hardcoded transitions first
+        if (Transitions.TryGetValue((from, to), out var allowedRoles) && allowedRoles.Contains(userRole))
+            return true;
+
+        // For close transitions, check dynamic __close__ rules
+        if (to == CaseStatus.Closed)
+        {
+            var closeRules = await _forwardingRuleRepository.FindAsync(
+                r => r.FromRole == userRole && r.ToRole == "__close__" && r.IsActive);
+            if (closeRules.Any()) return true;
+        }
+
+        // For hearing transitions, check dynamic __hearing__ rules
+        if (to == CaseStatus.HearingScheduled)
+        {
+            var hearingRules = await _forwardingRuleRepository.FindAsync(
+                r => r.FromRole == userRole && r.ToRole == "__hearing__" && r.IsActive);
+            if (hearingRules.Any()) return true;
+        }
+
         return false;
     }
 

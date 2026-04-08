@@ -201,7 +201,7 @@ public class CaseService : ICaseService
         var oldStatus = c.Status;
         var newStatus = MappingExtensions.ParseEnum<CaseStatus>(request.Status);
 
-        if (!_workflowService.ValidateTransition(oldStatus, newStatus, userRole))
+        if (!await _workflowService.ValidateTransitionAsync(oldStatus, newStatus, userRole))
             return ApiResponse<CaseDto>.FailResponse($"Transition from '{oldStatus.ToKebabCase()}' to '{newStatus.ToKebabCase()}' is not allowed for role '{userRole}'.");
 
         c.Status = newStatus;

@@ -90,6 +90,9 @@ public class HearingService : IHearingService
         if (request.Notes is not null)
             hearing.Notes = request.Notes;
 
+        if (request.Remarks is not null)
+            hearing.Remarks = request.Remarks;
+
         hearing.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.Hearings.Update(hearing);
         await _unitOfWork.SaveChangesAsync();

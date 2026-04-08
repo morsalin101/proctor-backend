@@ -7,4 +7,5 @@ public class UpdateHearingRequest
     public string? Location { get; set; }
     public List<string>? Participants { get; set; }
     public string? Notes { get; set; }
+    public string? Remarks { get; set; }
 }

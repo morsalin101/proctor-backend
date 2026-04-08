@@ -11,6 +11,7 @@ public class Hearing : BaseEntity
     public List<string> Participants { get; set; } = new();
     public HearingStatus Status { get; set; }
     public string? Notes { get; set; }
+    public string? Remarks { get; set; }
 
     public Case Case { get; set; } = null!;
 }
