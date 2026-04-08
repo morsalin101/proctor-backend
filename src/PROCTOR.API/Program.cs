@@ -72,7 +72,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins(
             "http://localhost:5173",
-            "http://proctorfrontend.109.199.115.214.sslip.io"
+            "http://proctorfrontend.109.199.115.214.sslip.io",
+            "https://proctorfrontend.109.199.115.214.sslip.io"
         )
             .AllowAnyHeader()
             .AllowAnyMethod()
