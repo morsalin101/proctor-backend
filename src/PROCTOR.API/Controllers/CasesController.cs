@@ -29,7 +29,11 @@ public class CasesController : ControllerBase
         User.FindFirst("role")?.Value ?? "";
 
     private string GetCurrentUserId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        // JWT bearer config has MapInboundClaims = false, so the user ID is under the 'sub' claim,
+        // not ClaimTypes.NameIdentifier. Fall back to NameIdentifier just in case.
+        User.FindFirst("sub")?.Value
+        ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? "";
 
     [HttpGet]
     public async Task<IActionResult> GetCases(

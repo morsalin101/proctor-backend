@@ -30,13 +30,31 @@ public class ForwardingRuleService : IForwardingRuleService
 
     public async Task<ApiResponse<List<ForwardingRuleDto>>> GetRulesForRoleAsync(string fromRole)
     {
-        var rules = await _repository.FindAsync(r => r.FromRole == fromRole && r.IsActive);
+        // Exclude internal special rules (__close__, __hearing__) from the role-to-role forwarding list
+        var rules = await _repository.FindAsync(r =>
+            r.FromRole == fromRole && r.IsActive
+            && r.ToRole != "__close__" && r.ToRole != "__hearing__");
         var dtos = rules.Select(r => new ForwardingRuleDto
         {
             Id = r.Id.ToString(), FromRole = r.FromRole, ToRole = r.ToRole,
             ResultStatus = r.ResultStatus, IsActive = r.IsActive
         }).ToList();
         return ApiResponse<List<ForwardingRuleDto>>.SuccessResponse(dtos);
+    }
+
+    public async Task<ApiResponse<SpecialPermissionDto>> GetSpecialPermissionsAsync(string fromRole)
+    {
+        // Super-admin always has both
+        if (fromRole == "super-admin")
+            return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto { CanClose = true, CanHearing = true });
+
+        var rules = await _repository.FindAsync(r =>
+            r.FromRole == fromRole && r.IsActive
+            && (r.ToRole == "__close__" || r.ToRole == "__hearing__"));
+
+        var canClose = rules.Any(r => r.ToRole == "__close__");
+        var canHearing = rules.Any(r => r.ToRole == "__hearing__");
+        return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto { CanClose = canClose, CanHearing = canHearing });
     }
 
     public async Task<ApiResponse<ForwardingRuleDto>> CreateAsync(CreateForwardingRuleRequest request)

@@ -21,3 +21,9 @@ public class UpdateForwardingRuleRequest
     public string? ResultStatus { get; set; }
     public bool? IsActive { get; set; }
 }
+
+public class SpecialPermissionDto
+{
+    public bool CanClose { get; set; }
+    public bool CanHearing { get; set; }
+}

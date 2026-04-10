@@ -72,8 +72,10 @@ public class WorkflowService : IWorkflowService
         if (Transitions.TryGetValue((from, to), out var allowedRoles) && allowedRoles.Contains(userRole))
             return true;
 
-        // For close transitions, check dynamic __close__ rules
-        if (to == CaseStatus.Closed)
+        // For close/resolve transitions, check dynamic __close__ rules.
+        // A "Case Close Permission" grants the role the ability to mark a case Resolved
+        // OR Closed (or PoliceCase as an equivalent terminal state).
+        if (to == CaseStatus.Closed || to == CaseStatus.Resolved || to == CaseStatus.PoliceCase)
         {
             var closeRules = await _forwardingRuleRepository.FindAsync(
                 r => r.FromRole == userRole && r.ToRole == "__close__" && r.IsActive);

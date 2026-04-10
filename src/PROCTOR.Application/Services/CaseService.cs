@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Cases;
 using PROCTOR.Application.DTOs.Reports;
@@ -417,10 +418,22 @@ public class CaseService : ICaseService
         return ApiResponse<bool>.SuccessResponse(true, "Case deleted successfully.");
     }
 
+    private static Expression<Func<Case, bool>> BuildMyCasesFilter(Guid userId, string userRole)
+    {
+        // Students see ONLY cases they personally submitted - never role-shared cases
+        if (userRole == "student")
+            return c => c.SubmittedByUserId == userId;
+
+        // Other staff see assigned-to-me + their role queue + anything they happened to submit
+        return c => c.AssignedToId == userId
+                 || c.ForwardedToRole == userRole
+                 || c.SubmittedByUserId == userId;
+    }
+
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetMyCasesAsync(Guid userId, string userRole, int page, int pageSize)
     {
-        var allCases = await _unitOfWork.Cases.FindAsync(c =>
-            c.ForwardedToRole == userRole || c.AssignedToId == userId || c.SubmittedByUserId == userId);
+        var filter = BuildMyCasesFilter(userId, userRole);
+        var allCases = await _unitOfWork.Cases.FindAsync(filter);
 
         var totalCount = allCases.Count();
         var items = allCases
@@ -442,9 +455,8 @@ public class CaseService : ICaseService
 
     public async Task<ApiResponse<int>> GetMyCasesCountAsync(Guid userId, string userRole)
     {
-        var count = await _unitOfWork.Cases.CountAsync(c =>
-            c.ForwardedToRole == userRole || c.AssignedToId == userId || c.SubmittedByUserId == userId);
-
+        var filter = BuildMyCasesFilter(userId, userRole);
+        var count = await _unitOfWork.Cases.CountAsync(filter);
         return ApiResponse<int>.SuccessResponse(count);
     }
 }

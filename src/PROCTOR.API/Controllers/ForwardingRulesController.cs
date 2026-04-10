@@ -28,6 +28,13 @@ public class ForwardingRulesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("special/{role}")]
+    public async Task<IActionResult> GetSpecial(string role)
+    {
+        var response = await _service.GetSpecialPermissionsAsync(role);
+        return Ok(response);
+    }
+
     [HttpPost]
     [Authorize(Roles = "super-admin")]
     public async Task<IActionResult> Create([FromBody] CreateForwardingRuleRequest request)
