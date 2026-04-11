@@ -45,6 +45,15 @@ public class NotificationsController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(new { count }));
     }
 
+    [HttpGet("category-counts")]
+    public async Task<IActionResult> GetCategoryCounts()
+    {
+        var userId = GetCurrentUserId();
+        var role = GetCurrentUserRole();
+        var counts = await _notificationService.GetUnreadCountsByCategoryAsync(userId, role);
+        return Ok(ApiResponse<object>.SuccessResponse(counts));
+    }
+
     [HttpPatch("{id:guid}/read")]
     public async Task<IActionResult> MarkAsRead(Guid id)
     {

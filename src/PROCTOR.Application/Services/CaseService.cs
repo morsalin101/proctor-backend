@@ -15,12 +15,14 @@ public class CaseService : ICaseService
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
     private readonly IWorkflowService _workflowService;
+    private readonly ISystemSettingService _systemSettingService;
 
-    public CaseService(IUnitOfWork unitOfWork, INotificationService notificationService, IWorkflowService workflowService)
+    public CaseService(IUnitOfWork unitOfWork, INotificationService notificationService, IWorkflowService workflowService, ISystemSettingService systemSettingService)
     {
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
         _workflowService = workflowService;
+        _systemSettingService = systemSettingService;
     }
 
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetCasesAsync(
@@ -130,10 +132,42 @@ public class CaseService : ICaseService
         // Reload with details
         var created = await _unitOfWork.Cases.GetByIdWithDetailsAsync(newCase.Id);
 
-        // Notify relevant roles based on case type
-        var targetRole = newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
-        await _notificationService.CreateAsync(null, targetRole, "New Case Submitted",
-            $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+        // Route notifications + ForwardedToRole based on case type
+        if (newCase.Type == CaseType.Type1)
+        {
+            // Type-1 cases bypass coordinator and route directly to the configured roles
+            // (Settings → Incident Routing → "Type-1 Incident Forwarding").
+            var settingResp = await _systemSettingService.GetSettingByKeyAsync("type1_forwarding_roles");
+            var rolesCsv = settingResp?.Data?.Value;
+            if (string.IsNullOrWhiteSpace(rolesCsv))
+                rolesCsv = "proctor,deputy-proctor";
+
+            var targetRoles = rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                      .Select(r => r.Trim())
+                                      .Where(r => !string.IsNullOrEmpty(r))
+                                      .ToList();
+
+            foreach (var roleKey in targetRoles)
+            {
+                await _notificationService.CreateAsync(null, roleKey, "New Type-1 Incident",
+                    $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+            }
+
+            // Setting ForwardedToRole makes the case appear in the role-queue side of My Cases
+            // for any user with that role.
+            if (targetRoles.Count > 0)
+            {
+                newCase.ForwardedToRole = targetRoles[0];
+                _unitOfWork.Cases.Update(newCase);
+                await _unitOfWork.SaveChangesAsync();
+            }
+        }
+        else
+        {
+            var targetRole = newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
+            await _notificationService.CreateAsync(null, targetRole, "New Case Submitted",
+                $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+        }
 
         return ApiResponse<CaseDto>.SuccessResponse(created!.ToDto(), "Case created successfully.");
     }

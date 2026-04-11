@@ -9,6 +9,8 @@ public static class DbSeeder
         await RoleSeeder.SeedAsync(context);
         await UserSeeder.SeedAsync(context);
         await MenuPermissionSeeder.SeedAsync(context);
+        // Idempotently add missing my-cases / notifications rows for existing databases
+        await MenuPermissionSeeder.BackfillMissingPermissionsAsync(context);
         await SystemSettingSeeder.SeedAsync(context);
         await ForwardingRuleSeeder.SeedAsync(context);
         await ForwardingRuleSeeder.SeedSpecialRulesAsync(context);

@@ -29,6 +29,11 @@ public class UnitOfWork : IUnitOfWork
         _context.Set<T>().Add(entity);
     }
 
+    public void Remove<T>(T entity) where T : class
+    {
+        _context.Set<T>().Remove(entity);
+    }
+
     public void Dispose()
     {
         _context.Dispose();

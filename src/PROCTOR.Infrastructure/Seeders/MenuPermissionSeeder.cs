@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
 using PROCTOR.Infrastructure.Data;
@@ -24,6 +25,8 @@ public static class MenuPermissionSeeder
             ["dashboard"] = "R",
             ["submit"] = "CR",
             ["cases"] = "R",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["settings"] = "RU"
         });
 
@@ -33,6 +36,8 @@ public static class MenuPermissionSeeder
             ["submit"] = "CR",
             ["incidents"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["settings"] = "RU"
         });
 
@@ -43,6 +48,8 @@ public static class MenuPermissionSeeder
             ["dashboard"] = "R",
             ["incidents"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["hearings"] = "CRUD",
             ["settings"] = "RU"
         });
@@ -52,6 +59,8 @@ public static class MenuPermissionSeeder
             ["dashboard"] = "R",
             ["incidents"] = "R",
             ["cases"] = "CRUD",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["hearings"] = "CRUD",
             ["reports"] = "R",
             ["settings"] = "RU"
@@ -61,6 +70,8 @@ public static class MenuPermissionSeeder
         {
             ["dashboard"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["reports"] = "R",
             ["settings"] = "RU"
         });
@@ -69,6 +80,8 @@ public static class MenuPermissionSeeder
         {
             ["dashboard"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["hearings"] = "CRUD",
             ["reports"] = "R",
             ["settings"] = "RU"
@@ -78,6 +91,8 @@ public static class MenuPermissionSeeder
         {
             ["dashboard"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["confidential"] = "CRUD",
             ["settings"] = "RU"
         });
@@ -86,6 +101,8 @@ public static class MenuPermissionSeeder
         {
             ["dashboard"] = "R",
             ["cases"] = "RU",
+            ["my-cases"] = "R",
+            ["notifications"] = "R",
             ["confidential"] = "CRUD",
             ["settings"] = "RU"
         });
@@ -129,6 +146,50 @@ public static class MenuPermissionSeeder
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
+        }
+    }
+
+    // Inserts missing my-cases / notifications rows for existing roles on already-seeded databases.
+    // Idempotent: skips any (role, menuKey) pair that already exists. Called from Program.cs after SeedAsync.
+    public static async Task BackfillMissingPermissionsAsync(ProctorDbContext context)
+    {
+        var defaultMenuKeys = new[] { "my-cases", "notifications" };
+        var rolesToBackfill = new[]
+        {
+            UserRole.Student, UserRole.Coordinator, UserRole.AssistantProctor, UserRole.DeputyProctor,
+            UserRole.Registrar, UserRole.DisciplinaryCommittee, UserRole.FemaleCoordinator,
+            UserRole.SexualHarassmentCommittee
+        };
+
+        var newRows = new List<MenuPermission>();
+        foreach (var role in rolesToBackfill)
+        {
+            var roleId = RoleSeeder.GetDeterministicGuid(role);
+            foreach (var menuKey in defaultMenuKeys)
+            {
+                var exists = await context.MenuPermissions
+                    .AnyAsync(mp => mp.RoleId == roleId && mp.MenuKey == menuKey);
+                if (exists) continue;
+
+                newRows.Add(new MenuPermission
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = roleId,
+                    MenuKey = menuKey,
+                    CanCreate = false,
+                    CanRead = true,
+                    CanUpdate = false,
+                    CanDelete = false,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        if (newRows.Count > 0)
+        {
+            await context.MenuPermissions.AddRangeAsync(newRows);
+            await context.SaveChangesAsync();
         }
     }
 

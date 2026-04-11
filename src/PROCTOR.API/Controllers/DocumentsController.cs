@@ -106,4 +106,40 @@ public class DocumentsController : ControllerBase
 
         return Ok(ApiResponse<DocumentDto>.SuccessResponse(documentDto, "Document added successfully"));
     }
+
+    [HttpDelete("{documentId:guid}")]
+    public async Task<IActionResult> DeleteDocument(Guid caseId, Guid documentId)
+    {
+        var caseEntity = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
+        if (caseEntity == null)
+            return NotFound(ApiResponse<object>.FailResponse("Case not found"));
+
+        var doc = caseEntity.Documents.FirstOrDefault(d => d.Id == documentId);
+        if (doc == null)
+            return NotFound(ApiResponse<object>.FailResponse("Document not found"));
+
+        // Delete file from disk (best-effort)
+        try
+        {
+            var diskPath = Path.Combine(_env.ContentRootPath, "wwwroot", doc.Url.TrimStart('/'));
+            if (System.IO.File.Exists(diskPath)) System.IO.File.Delete(diskPath);
+        }
+        catch { /* swallow disk errors so DB delete still proceeds */ }
+
+        _unitOfWork.Remove(doc);
+
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = caseId,
+            Action = "Document Removed",
+            Description = $"Document '{doc.Name}' was removed by {GetCurrentUserName()}",
+            User = GetCurrentUserName(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+
+        await _unitOfWork.SaveChangesAsync();
+        return Ok(ApiResponse<object>.SuccessResponse(new { }, "Document deleted"));
+    }
 }

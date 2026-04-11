@@ -9,4 +9,5 @@ public interface INotificationService
     Task MarkAsReadAsync(Guid notificationId);
     Task MarkAllAsReadAsync(Guid userId, string role);
     Task<int> GetUnreadCountAsync(Guid userId, string role);
+    Task<NotificationCategoryCountsDto> GetUnreadCountsByCategoryAsync(Guid userId, string role);
 }

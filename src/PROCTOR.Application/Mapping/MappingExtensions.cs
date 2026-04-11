@@ -93,6 +93,7 @@ public static class MappingExtensions
         Verdict = c.Verdict,
         Recommendation = c.Recommendation,
         ForwardedToRole = c.ForwardedToRole,
+        SubmittedByUserId = c.SubmittedByUserId?.ToString(),
         StudentDepartment = c.StudentDepartment,
         StudentContact = c.StudentContact,
         StudentAdvisorName = c.StudentAdvisorName,

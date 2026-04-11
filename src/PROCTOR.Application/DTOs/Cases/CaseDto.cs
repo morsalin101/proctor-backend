@@ -22,6 +22,7 @@ public class CaseDto
     public string? Verdict { get; set; }
     public string? Recommendation { get; set; }
     public string? ForwardedToRole { get; set; }
+    public string? SubmittedByUserId { get; set; }
 
     // Type-2 form fields
     public string? StudentDepartment { get; set; }
