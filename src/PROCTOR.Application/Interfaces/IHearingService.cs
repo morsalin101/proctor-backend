@@ -10,4 +10,5 @@ public interface IHearingService
     Task<ApiResponse<HearingDto>> CreateHearingAsync(CreateHearingRequest request);
     Task<ApiResponse<HearingDto>> UpdateHearingAsync(Guid id, UpdateHearingRequest request);
     Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status);
+    Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId);
 }

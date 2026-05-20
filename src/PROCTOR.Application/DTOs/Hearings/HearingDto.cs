@@ -4,6 +4,8 @@ public class HearingDto
 {
     public string Id { get; set; } = string.Empty;
     public string CaseId { get; set; } = string.Empty;
+    public string? CaseNumber { get; set; }
+    public string? StudentName { get; set; }
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
@@ -11,4 +13,12 @@ public class HearingDto
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string? Remarks { get; set; }
+}
+
+public class UpcomingHearingsDto
+{
+    public List<HearingDto> Today { get; set; } = new();
+    public List<HearingDto> Tomorrow { get; set; } = new();
+    public List<HearingDto> ThisWeek { get; set; } = new();
+    public List<HearingDto> Later { get; set; } = new();
 }

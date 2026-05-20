@@ -11,10 +11,12 @@ namespace PROCTOR.Application.Services;
 public class UserService : IUserService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IForwardingRuleService _forwardingRuleService;
 
-    public UserService(IUnitOfWork unitOfWork)
+    public UserService(IUnitOfWork unitOfWork, IForwardingRuleService forwardingRuleService)
     {
         _unitOfWork = unitOfWork;
+        _forwardingRuleService = forwardingRuleService;
     }
 
     public async Task<ApiResponse<List<UserDto>>> GetAllUsersAsync()
@@ -48,6 +50,9 @@ public class UserService : IUserService
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = role,
+            Gender = !string.IsNullOrWhiteSpace(request.Gender)
+                ? MappingExtensions.ParseEnum<Gender>(request.Gender)
+                : Gender.Unspecified,
             IsActive = true,
             RankName = request.Rank
         };
@@ -75,6 +80,9 @@ public class UserService : IUserService
 
         if (request.Role is not null)
             user.Role = MappingExtensions.ParseEnum<UserRole>(request.Role);
+
+        if (request.Gender is not null)
+            user.Gender = MappingExtensions.ParseEnum<Gender>(request.Gender);
 
         if (request.IsActive.HasValue)
             user.IsActive = request.IsActive.Value;
@@ -108,6 +116,40 @@ public class UserService : IUserService
         var roleEnum = MappingExtensions.ParseEnum<UserRole>(role);
         var users = await _unitOfWork.Users.FindAsync(u => u.Role == roleEnum && u.IsActive);
         var dtos = users.Select(u => u.ToDto()).ToList();
+        return ApiResponse<List<UserDto>>.SuccessResponse(dtos);
+    }
+
+    public async Task<ApiResponse<List<UserDto>>> GetForwardableUsersAsync(string fromRole)
+    {
+        // The active forwarding rules ARE the forward permissions: whichever roles
+        // `fromRole` may forward to determine whose members appear in the dropdown.
+        // GetRulesForRoleAsync already excludes the internal __close__/__hearing__ rules.
+        var rulesResponse = await _forwardingRuleService.GetRulesForRoleAsync(fromRole);
+        var targetRoles = (rulesResponse.Data ?? new())
+            .Where(r => r.IsActive)
+            .Select(r => r.ToRole)
+            .Distinct()
+            .ToList();
+
+        if (targetRoles.Count == 0)
+            return ApiResponse<List<UserDto>>.SuccessResponse(new List<UserDto>());
+
+        var roleEnums = new List<UserRole>();
+        foreach (var role in targetRoles)
+        {
+            if (Enum.TryParse<UserRole>(role.Replace("-", ""), true, out var parsed))
+                roleEnums.Add(parsed);
+        }
+
+        if (roleEnums.Count == 0)
+            return ApiResponse<List<UserDto>>.SuccessResponse(new List<UserDto>());
+
+        var users = await _unitOfWork.Users.FindAsync(u => roleEnums.Contains(u.Role) && u.IsActive);
+        var dtos = users
+            .Select(u => u.ToDto())
+            .OrderBy(u => u.Role)
+            .ThenBy(u => u.Name)
+            .ToList();
         return ApiResponse<List<UserDto>>.SuccessResponse(dtos);
     }
 }

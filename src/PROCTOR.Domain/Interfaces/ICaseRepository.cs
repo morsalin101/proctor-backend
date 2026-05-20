@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
 
@@ -9,4 +10,5 @@ public interface ICaseRepository : IRepository<Case>
     Task<IEnumerable<Case>> GetFilteredAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search, int page, int pageSize);
     Task<int> GetFilteredCountAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search);
     Task<string> GenerateCaseNumberAsync();
+    Task<IEnumerable<Case>> FindWithDetailsAsync(Expression<Func<Case, bool>> predicate);
 }

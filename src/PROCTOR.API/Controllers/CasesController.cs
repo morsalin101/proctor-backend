@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Cases;
 using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.Interfaces;
@@ -15,11 +16,13 @@ public class CasesController : ControllerBase
 {
     private readonly ICaseService _caseService;
     private readonly IPermissionChecker _permissionChecker;
+    private readonly IForwardingRuleService _forwardingRuleService;
 
-    public CasesController(ICaseService caseService, IPermissionChecker permissionChecker)
+    public CasesController(ICaseService caseService, IPermissionChecker permissionChecker, IForwardingRuleService forwardingRuleService)
     {
         _caseService = caseService;
         _permissionChecker = permissionChecker;
+        _forwardingRuleService = forwardingRuleService;
     }
 
     private string GetCurrentUserName() =>
@@ -78,6 +81,40 @@ public class CasesController : ControllerBase
         if (!response.Success)
             return BadRequest(response);
 
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/acknowledge")]
+    [Authorize(Roles = "proctor,assistant-proctor,deputy-proctor,coordinator,female-coordinator,super-admin")]
+    public async Task<IActionResult> AcknowledgeCase(Guid id, [FromBody] AcknowledgeCaseRequest request)
+    {
+        var userIdStr = GetCurrentUserId();
+        if (!Guid.TryParse(userIdStr, out var userId))
+            return BadRequest("Invalid user.");
+        var userName = GetCurrentUserName();
+        var response = await _caseService.AcknowledgeCaseAsync(id, request, userId, userName);
+        if (!response.Success)
+            return BadRequest(response);
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/assignments")]
+    public async Task<IActionResult> AssignCase(Guid id, [FromBody] AssignCaseRequest request)
+    {
+        // Assignment permission is dynamic: a role may assign only if it has the
+        // __assign__ special forwarding permission (configured in Settings → Forwarding).
+        var role = GetCurrentUserRole();
+        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role);
+        if (!(special.Data?.CanAssign ?? false))
+            return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have case assignment permission."));
+
+        var userIdStr = GetCurrentUserId();
+        if (!Guid.TryParse(userIdStr, out var userId))
+            return BadRequest("Invalid user.");
+        var userName = GetCurrentUserName();
+        var response = await _caseService.AssignCaseAsync(id, request, userId, userName);
+        if (!response.Success)
+            return BadRequest(response);
         return Ok(response);
     }
 

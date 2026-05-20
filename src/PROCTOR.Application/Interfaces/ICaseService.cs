@@ -12,6 +12,8 @@ public interface ICaseService
     Task<ApiResponse<CaseDto>> UpdateCaseAsync(Guid id, UpdateCaseRequest request);
     Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy, string userRole);
     Task<ApiResponse<CaseDto>> ForwardCaseAsync(Guid id, ForwardCaseRequest request, string updatedBy, string userRole);
+    Task<ApiResponse<CaseDto>> AcknowledgeCaseAsync(Guid id, AcknowledgeCaseRequest request, Guid userId, string userName);
+    Task<ApiResponse<CaseDto>> AssignCaseAsync(Guid id, AssignCaseRequest request, Guid actingUserId, string actingUserName);
     Task<ApiResponse<ReportDto>> CreateReportAsync(Guid caseId, CreateReportRequest request, string createdByName, Guid createdById);
     Task<ApiResponse<List<ReportDto>>> GetReportsAsync(Guid caseId);
     Task<ApiResponse<ReportDto>> UpdateReportAsync(Guid caseId, Guid reportId, CreateReportRequest request, string updatedByName);

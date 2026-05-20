@@ -1,0 +1,9 @@
+namespace PROCTOR.Domain.Enums;
+
+public enum Gender
+{
+    Unspecified,
+    Male,
+    Female,
+    Other
+}

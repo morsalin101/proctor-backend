@@ -63,6 +63,21 @@ public static class ForwardingRuleSeeder
             await context.ForwardingRules.AddRangeAsync(hearingRules);
         }
 
+        var hasAssign = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__assign__");
+        if (!hasAssign)
+        {
+            var assignRules = new List<ForwardingRule>
+            {
+                new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "__assign__", ResultStatus = "assigned" },
+                new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "__assign__", ResultStatus = "assigned" },
+                new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "__assign__", ResultStatus = "assigned" },
+                new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "__assign__", ResultStatus = "assigned" },
+                new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "__assign__", ResultStatus = "assigned" },
+                new() { Id = Guid.NewGuid(), FromRole = "super-admin", ToRole = "__assign__", ResultStatus = "assigned" },
+            };
+            await context.ForwardingRules.AddRangeAsync(assignRules);
+        }
+
         await context.SaveChangesAsync();
     }
 }

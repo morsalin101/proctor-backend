@@ -60,6 +60,15 @@ public class UsersController : ControllerBase
         return Ok(response);
     }
 
+    // Returns every active user the given role may forward a case to, derived
+    // from the active forwarding rules. Powers the unified Forward dropdown.
+    [HttpGet("forwardable/{fromRole}")]
+    public async Task<IActionResult> GetForwardableUsers(string fromRole)
+    {
+        var response = await _userService.GetForwardableUsersAsync(fromRole);
+        return Ok(response);
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {

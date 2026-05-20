@@ -31,7 +31,24 @@ public class Case : BaseEntity
     public string? VideoLink { get; set; }
     public DateTime? IncidentDate { get; set; }
 
+    // Type-1 acknowledgment (set by proctor/assistant/deputy on receipt)
+    public bool IsAcknowledged { get; set; }
+    public DateTime? AcknowledgedAt { get; set; }
+    public Guid? AcknowledgedById { get; set; }
+    public string? AcknowledgedByName { get; set; }
+    public string? AcknowledgmentComment { get; set; }
+
+    // Type-1 incident location (captured via browser geolocation)
+    public double? IncidentLatitude { get; set; }
+    public double? IncidentLongitude { get; set; }
+    public string? IncidentLocationDescription { get; set; }
+
+    // Category replaces the student-set "Confidential" flag
+    public Guid? CategoryId { get; set; }
+    public CaseCategory? Category { get; set; }
+
     public User? AssignedTo { get; set; }
+    public ICollection<CaseAssignment> Assignments { get; set; } = new List<CaseAssignment>();
     public ICollection<Document> Documents { get; set; } = new List<Document>();
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Hearing> Hearings { get; set; } = new List<Hearing>();

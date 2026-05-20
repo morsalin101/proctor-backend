@@ -8,6 +8,14 @@ public class CreateCaseRequest
     public string Priority { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
 
+    // Category (admin-managed). For Type-2 submissions this drives confidentiality.
+    public string? CategoryId { get; set; }
+
+    // Type-1 incident location (captured via browser geolocation)
+    public double? IncidentLatitude { get; set; }
+    public double? IncidentLongitude { get; set; }
+    public string? IncidentLocationDescription { get; set; }
+
     // Type-2 form fields
     public string? StudentDepartment { get; set; }
     public string? StudentContact { get; set; }

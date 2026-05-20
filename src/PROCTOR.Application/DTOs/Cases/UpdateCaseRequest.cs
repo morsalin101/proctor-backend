@@ -5,6 +5,11 @@ public class UpdateCaseRequest
     public string? Priority { get; set; }
     public string? Description { get; set; }
     public string? AssignedToId { get; set; }
+    public string? CategoryId { get; set; }
+
+    public double? IncidentLatitude { get; set; }
+    public double? IncidentLongitude { get; set; }
+    public string? IncidentLocationDescription { get; set; }
 
     // Type-2 form fields
     public string? StudentDepartment { get; set; }
@@ -19,4 +24,8 @@ public class UpdateCaseRequest
     public string? AccusedGuardianContact { get; set; }
     public string? VideoLink { get; set; }
     public string? IncidentDate { get; set; }
+
+    // For student edit: replace complainants and accused
+    public List<CreateCaseComplainantRequest>? Complainants { get; set; }
+    public List<CreateCaseAccusedRequest>? AccusedPersons { get; set; }
 }

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
@@ -10,6 +11,18 @@ public class CaseRepository : Repository<Case>, ICaseRepository
 {
     public CaseRepository(ProctorDbContext context) : base(context) { }
 
+    public async Task<IEnumerable<Case>> FindWithDetailsAsync(Expression<Func<Case, bool>> predicate)
+    {
+        return await _dbSet
+            .Include(c => c.Category)
+            .Include(c => c.AccusedPersons)
+            .Include(c => c.Complainants)
+            .Include(c => c.AssignedTo)
+            .Include(c => c.Assignments)
+            .Where(predicate)
+            .ToListAsync();
+    }
+
     public async Task<Case?> GetByIdWithDetailsAsync(Guid id)
     {
         return await _dbSet
@@ -21,6 +34,8 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Reports)
             .Include(c => c.Complainants)
             .Include(c => c.AccusedPersons)
+            .Include(c => c.Category)
+            .Include(c => c.Assignments).ThenInclude(a => a.User)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
@@ -35,6 +50,10 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         var query = ApplyFilters(status, type, priority, search);
 
         return await query
+            .Include(c => c.Category)
+            .Include(c => c.AccusedPersons)
+            .Include(c => c.Complainants)
+            .Include(c => c.AssignedTo)
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

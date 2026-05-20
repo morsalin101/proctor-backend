@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PROCTOR.Application.DTOs.Hearings;
@@ -18,10 +19,36 @@ public class HearingsController : ControllerBase
         _hearingService = hearingService;
     }
 
+    private string GetCurrentUserId() =>
+        User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+    private string GetCurrentUserRole() =>
+        User.FindFirst("role")?.Value ?? "";
+
     [HttpGet]
     public async Task<IActionResult> GetHearings([FromQuery] Guid? caseId)
     {
         var response = await _hearingService.GetHearingsAsync(caseId);
+        return Ok(response);
+    }
+
+    [HttpGet("upcoming")]
+    public async Task<IActionResult> GetUpcoming([FromQuery] bool mineOnly = false)
+    {
+        Guid? filterUserId = null;
+        if (mineOnly)
+        {
+            var role = GetCurrentUserRole();
+            // Coordinators / super-admin see everyone's upcoming hearings.
+            // Anyone else is filtered to their own assignments.
+            if (role != "coordinator" && role != "super-admin")
+            {
+                if (Guid.TryParse(GetCurrentUserId(), out var uid))
+                    filterUserId = uid;
+            }
+        }
+
+        var response = await _hearingService.GetUpcomingHearingsAsync(filterUserId);
         return Ok(response);
     }
 

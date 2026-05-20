@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
 using PROCTOR.Application.DTOs.Cases;
+
 using PROCTOR.Application.DTOs.Dashboard;
 using PROCTOR.Application.DTOs.Documents;
 using PROCTOR.Application.DTOs.Hearings;
@@ -12,6 +13,7 @@ using PROCTOR.Application.DTOs.Reports;
 using PROCTOR.Application.DTOs.Users;
 using PROCTOR.Application.DTOs.Articles;
 using PROCTOR.Application.DTOs.Ranks;
+using PROCTOR.Application.DTOs.CaseCategories;
 
 namespace PROCTOR.Application.Mapping;
 
@@ -73,6 +75,7 @@ public static class MappingExtensions
         Name = user.Name,
         Email = user.Email,
         Role = user.Role.ToKebabCase(),
+        Gender = user.Gender.ToKebabCase(),
         Avatar = user.Avatar,
         Rank = user.RankName
     };
@@ -87,6 +90,7 @@ public static class MappingExtensions
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
+        AssignedToId = c.AssignedToId?.ToString(),
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
         Description = c.Description,
@@ -94,6 +98,17 @@ public static class MappingExtensions
         Recommendation = c.Recommendation,
         ForwardedToRole = c.ForwardedToRole,
         SubmittedByUserId = c.SubmittedByUserId?.ToString(),
+        CategoryId = c.CategoryId?.ToString(),
+        CategoryName = c.Category?.Name,
+        CategoryIsConfidential = c.Category?.IsConfidential ?? false,
+        IsAcknowledged = c.IsAcknowledged,
+        AcknowledgedAt = c.AcknowledgedAt?.ToString("o"),
+        AcknowledgedById = c.AcknowledgedById?.ToString(),
+        AcknowledgedByName = c.AcknowledgedByName,
+        AcknowledgmentComment = c.AcknowledgmentComment,
+        IncidentLatitude = c.IncidentLatitude,
+        IncidentLongitude = c.IncidentLongitude,
+        IncidentLocationDescription = c.IncidentLocationDescription,
         StudentDepartment = c.StudentDepartment,
         StudentContact = c.StudentContact,
         StudentAdvisorName = c.StudentAdvisorName,
@@ -106,13 +121,36 @@ public static class MappingExtensions
         AccusedGuardianContact = c.AccusedGuardianContact,
         VideoLink = c.VideoLink,
         IncidentDate = c.IncidentDate?.ToString("o"),
+        Assignments = c.Assignments.Where(a => a.IsActive).Select(a => a.ToDto()).ToList(),
         Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
         AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
         Documents = c.Documents.Select(d => d.ToDto()).ToList(),
-        Notes = c.Notes.Select(n => n.ToDto()).ToList(),
+        Notes = c.Notes.OrderByDescending(n => n.CreatedAt).Select(n => n.ToDto()).ToList(),
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
-        Timeline = c.TimelineEvents.Select(t => t.ToDto()).ToList(),
+        Timeline = c.TimelineEvents.OrderByDescending(t => t.CreatedAt).Select(t => t.ToDto()).ToList(),
         Reports = c.Reports.Select(r => r.ToDto()).ToList()
+    };
+
+    public static CaseAssignmentDto ToDto(this CaseAssignment a) => new()
+    {
+        Id = a.Id.ToString(),
+        UserId = a.UserId.ToString(),
+        UserName = a.User?.Name ?? string.Empty,
+        UserRole = a.User?.Role.ToKebabCase() ?? string.Empty,
+        AssignedAt = a.AssignedAt.ToString("o"),
+        IsPrimary = a.IsPrimary,
+        IsActive = a.IsActive
+    };
+
+    public static CaseCategoryDto ToDto(this CaseCategory c) => new()
+    {
+        Id = c.Id.ToString(),
+        Name = c.Name,
+        Description = c.Description,
+        IsConfidential = c.IsConfidential,
+        IsActive = c.IsActive,
+        AppliesToType = c.AppliesToType.ToKebabCase(),
+        SortOrder = c.SortOrder
     };
 
     public static CaseListDto ToListDto(this Case c) => new()
@@ -128,7 +166,18 @@ public static class MappingExtensions
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
         Description = c.Description,
-        ForwardedToRole = c.ForwardedToRole
+        ForwardedToRole = c.ForwardedToRole,
+        CategoryName = c.Category?.Name,
+        CategoryIsConfidential = c.Category?.IsConfidential ?? false,
+        IsAcknowledged = c.IsAcknowledged,
+        IncidentLocationDescription = c.IncidentLocationDescription,
+        IncidentLatitude = c.IncidentLatitude,
+        IncidentLongitude = c.IncidentLongitude,
+        IncidentDate = c.IncidentDate?.ToString("o"),
+        StudentDepartment = c.StudentDepartment,
+        StudentContact = c.StudentContact,
+        AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
+        Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList()
     };
 
     public static DocumentDto ToDto(this Document d) => new()
@@ -154,6 +203,8 @@ public static class MappingExtensions
     {
         Id = h.Id.ToString(),
         CaseId = h.CaseId.ToString(),
+        CaseNumber = h.Case?.CaseNumber,
+        StudentName = h.Case?.StudentName,
         Date = h.Date,
         Time = h.Time,
         Location = h.Location,

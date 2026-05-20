@@ -1,3 +1,4 @@
+using System.Globalization;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Hearings;
 using PROCTOR.Application.Interfaces;
@@ -11,10 +12,14 @@ namespace PROCTOR.Application.Services;
 public class HearingService : IHearingService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
 
-    public HearingService(IUnitOfWork unitOfWork)
+    public HearingService(IUnitOfWork unitOfWork, INotificationService notificationService, IEmailService emailService)
     {
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
+        _emailService = emailService;
     }
 
     public async Task<ApiResponse<List<HearingDto>>> GetHearingsAsync(Guid? caseId)
@@ -42,7 +47,7 @@ public class HearingService : IHearingService
     public async Task<ApiResponse<HearingDto>> CreateHearingAsync(CreateHearingRequest request)
     {
         var caseId = Guid.Parse(request.CaseId);
-        var existingCase = await _unitOfWork.Cases.GetByIdAsync(caseId);
+        var existingCase = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
         if (existingCase is null)
             return ApiResponse<HearingDto>.FailResponse("Case not found.");
 
@@ -59,27 +64,38 @@ public class HearingService : IHearingService
 
         await _unitOfWork.Hearings.AddAsync(hearing);
 
-        // Update case status to HearingScheduled
         existingCase.Status = CaseStatus.HearingScheduled;
         existingCase.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.Cases.Update(existingCase);
 
         await _unitOfWork.SaveChangesAsync();
 
-        return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing created successfully.");
+        await NotifyHearingChangedAsync(existingCase, hearing, "Hearing Scheduled");
+
+        // Reload with case so DTO includes case info
+        var reloaded = await _unitOfWork.Hearings.GetByIdWithCaseAsync(hearing.Id);
+        return ApiResponse<HearingDto>.SuccessResponse((reloaded ?? hearing).ToDto(), "Hearing created successfully.");
     }
 
     public async Task<ApiResponse<HearingDto>> UpdateHearingAsync(Guid id, UpdateHearingRequest request)
     {
-        var hearing = await _unitOfWork.Hearings.GetByIdAsync(id);
+        var hearing = await _unitOfWork.Hearings.GetByIdWithCaseAsync(id);
         if (hearing is null)
             return ApiResponse<HearingDto>.FailResponse("Hearing not found.");
 
-        if (request.Date is not null)
-            hearing.Date = request.Date;
+        var dateChanged = false;
 
-        if (request.Time is not null)
+        if (request.Date is not null && request.Date != hearing.Date)
+        {
+            hearing.Date = request.Date;
+            dateChanged = true;
+        }
+
+        if (request.Time is not null && request.Time != hearing.Time)
+        {
             hearing.Time = request.Time;
+            dateChanged = true;
+        }
 
         if (request.Location is not null)
             hearing.Location = request.Location;
@@ -97,6 +113,13 @@ public class HearingService : IHearingService
         _unitOfWork.Hearings.Update(hearing);
         await _unitOfWork.SaveChangesAsync();
 
+        if (dateChanged && hearing.Case is not null)
+        {
+            var fullCase = await _unitOfWork.Cases.GetByIdWithDetailsAsync(hearing.CaseId);
+            if (fullCase is not null)
+                await NotifyHearingChangedAsync(fullCase, hearing, "Hearing Rescheduled");
+        }
+
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing updated successfully.");
     }
 
@@ -110,7 +133,6 @@ public class HearingService : IHearingService
         hearing.Status = newStatus;
         hearing.UpdatedAt = DateTime.UtcNow;
 
-        // If hearing completed, update case status
         if (newStatus == HearingStatus.Completed)
         {
             var existingCase = hearing.Case;
@@ -123,5 +145,83 @@ public class HearingService : IHearingService
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing status updated successfully.");
+    }
+
+    public async Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId)
+    {
+        var allHearings = await _unitOfWork.Hearings.GetAllAsync();
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        var endOfWeek = today.AddDays(7);
+
+        var result = new UpcomingHearingsDto();
+
+        foreach (var h in allHearings)
+        {
+            if (h.Status == HearingStatus.Completed || h.Status == HearingStatus.Cancelled)
+                continue;
+
+            if (!DateTime.TryParse(h.Date, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var hDate))
+                continue;
+
+            // Filter to hearings on cases assigned to the user (if userId provided)
+            if (userId.HasValue)
+            {
+                var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(h.CaseId);
+                if (c is null) continue;
+                var participates = c.AssignedToId == userId.Value
+                    || c.Assignments.Any(a => a.IsActive && a.UserId == userId.Value);
+                if (!participates) continue;
+            }
+
+            var hearingWithCase = await _unitOfWork.Hearings.GetByIdWithCaseAsync(h.Id);
+            var dto = (hearingWithCase ?? h).ToDto();
+
+            var dateOnly = hDate.Date;
+            if (dateOnly < today)
+            {
+                continue;
+            }
+            else if (dateOnly == today)
+            {
+                result.Today.Add(dto);
+            }
+            else if (dateOnly == tomorrow)
+            {
+                result.Tomorrow.Add(dto);
+            }
+            else if (dateOnly <= endOfWeek)
+            {
+                result.ThisWeek.Add(dto);
+            }
+            else
+            {
+                result.Later.Add(dto);
+            }
+        }
+
+        return ApiResponse<UpcomingHearingsDto>.SuccessResponse(result);
+    }
+
+    private async Task NotifyHearingChangedAsync(Case c, Hearing hearing, string title)
+    {
+        var message = $"Hearing for case {c.CaseNumber} is on {hearing.Date} at {hearing.Time} ({hearing.Location}).";
+
+        var notifyUserIds = new HashSet<Guid>();
+        if (c.AssignedToId.HasValue) notifyUserIds.Add(c.AssignedToId.Value);
+        foreach (var a in c.Assignments.Where(a => a.IsActive))
+            notifyUserIds.Add(a.UserId);
+        if (c.SubmittedByUserId.HasValue) notifyUserIds.Add(c.SubmittedByUserId.Value);
+
+        foreach (var uid in notifyUserIds)
+        {
+            await _notificationService.CreateAsync(uid, null, title, message, c.Id);
+            var user = await _unitOfWork.Users.GetByIdAsync(uid);
+            if (user is not null && !string.IsNullOrWhiteSpace(user.Email))
+            {
+                var body = $"Hello {user.Name},\n\n{message}\n\nThis is a demo email — no real SMTP is configured yet.";
+                await _emailService.SendAsync(user.Email, title + ": " + c.CaseNumber, body, c.Id);
+            }
+        }
     }
 }

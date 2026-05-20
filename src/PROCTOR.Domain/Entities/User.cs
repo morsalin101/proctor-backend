@@ -8,6 +8,7 @@ public class User : BaseEntity
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
+    public Gender Gender { get; set; } = Gender.Unspecified;
     public string? Avatar { get; set; }
     public bool IsActive { get; set; } = true;
     public string? RankName { get; set; }

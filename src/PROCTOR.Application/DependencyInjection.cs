@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<IArticleService, ArticleService>();
         services.AddScoped<IRankService, RankService>();
         services.AddScoped<IForwardingRuleService, ForwardingRuleService>();
+        services.AddScoped<ICaseCategoryService, CaseCategoryService>();
 
         return services;
     }

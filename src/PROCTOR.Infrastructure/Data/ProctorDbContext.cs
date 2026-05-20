@@ -26,10 +26,45 @@ public class ProctorDbContext : DbContext
     public DbSet<CaseComplainant> CaseComplainants => Set<CaseComplainant>();
     public DbSet<CaseAccused> CaseAccusedPersons => Set<CaseAccused>();
     public DbSet<ForwardingRule> ForwardingRules => Set<ForwardingRule>();
+    public DbSet<CaseCategory> CaseCategories => Set<CaseCategory>();
+    public DbSet<CaseAssignment> CaseAssignments => Set<CaseAssignment>();
+    public DbSet<SentEmail> SentEmails => Set<SentEmail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProctorDbContext).Assembly);
+
+        modelBuilder.Entity<CaseCategory>(b =>
+        {
+            b.HasIndex(x => x.Name).IsUnique();
+            b.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        });
+
+        modelBuilder.Entity<CaseAssignment>(b =>
+        {
+            b.HasOne(a => a.Case)
+                .WithMany(c => c.Assignments)
+                .HasForeignKey(a => a.CaseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(a => new { a.CaseId, a.UserId, a.IsActive });
+        });
+
+        modelBuilder.Entity<Case>(b =>
+        {
+            b.HasOne(c => c.Category)
+                .WithMany()
+                .HasForeignKey(c => c.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SentEmail>(b =>
+        {
+            b.HasIndex(x => x.RelatedCaseId);
+        });
     }
 }
