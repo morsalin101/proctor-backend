@@ -429,7 +429,12 @@ public class CaseService : ICaseService
         if (c.Status == CaseStatus.Submitted || c.Status == CaseStatus.Verified)
             c.Status = CaseStatus.Assigned;
 
-        _unitOfWork.Cases.Update(c);
+        // `c` was loaded with change-tracking, so mutating it (and adding/removing
+        // CaseAssignment children) is already detected by EF. Do NOT call Update(), which
+        // forces the whole graph to EntityState.Modified — that makes EF emit an UPDATE for
+        // the newly-added assignment rows (client-assigned Guid keys) which don't exist yet,
+        // causing the "expected to affect 1 row(s), but actually affected 0 row(s)" error.
+        c.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Add(new TimelineEvent
         {

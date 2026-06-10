@@ -163,6 +163,7 @@ public static class MappingExtensions
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
+        AssignedUserIds = c.Assignments.Where(a => a.IsActive).Select(a => a.UserId.ToString()).ToList(),
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
         Description = c.Description,
@@ -211,7 +212,17 @@ public static class MappingExtensions
         Participants = h.Participants,
         Status = h.Status.ToKebabCase(),
         Notes = h.Notes,
-        Remarks = h.Remarks
+        Remarks = h.Remarks,
+        EmailNotifications = h.EmailNotifications
+            .OrderByDescending(n => n.SentAt)
+            .Select(n => new HearingEmailNotificationDto
+            {
+                Recipients = n.Recipients,
+                Subject = n.Subject,
+                Message = n.Message,
+                SentBy = n.SentBy,
+                SentAt = n.SentAt.ToString("o")
+            }).ToList()
     };
 
     public static RecentActivityDto ToDto(this TimelineEvent t) => new()

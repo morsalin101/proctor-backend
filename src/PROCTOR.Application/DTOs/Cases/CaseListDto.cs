@@ -10,6 +10,7 @@ public class CaseListDto
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public string? AssignedTo { get; set; }
+    public List<string> AssignedUserIds { get; set; } = new();
     public string CreatedDate { get; set; } = string.Empty;
     public string UpdatedDate { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;

@@ -203,6 +203,53 @@ public class HearingService : IHearingService
         return ApiResponse<UpcomingHearingsDto>.SuccessResponse(result);
     }
 
+    public async Task<ApiResponse<HearingDto>> SendHearingEmailAsync(Guid id, NotifyHearingEmailRequest request, string sentByName)
+    {
+        var hearing = await _unitOfWork.Hearings.GetByIdWithCaseAsync(id);
+        if (hearing is null)
+            return ApiResponse<HearingDto>.FailResponse("Hearing not found.");
+
+        var recipients = (request.Recipients ?? new List<string>())
+            .Select(r => r?.Trim() ?? string.Empty)
+            .Where(r => r.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (recipients.Count == 0)
+            return ApiResponse<HearingDto>.FailResponse("At least one recipient email is required.");
+        if (string.IsNullOrWhiteSpace(request.Message))
+            return ApiResponse<HearingDto>.FailResponse("A message is required.");
+
+        var caseNumber = hearing.Case?.CaseNumber ?? "";
+        var subject = string.IsNullOrWhiteSpace(request.Subject)
+            ? $"Hearing notification — {caseNumber}".Trim()
+            : request.Subject!.Trim();
+        var body = $"{request.Message}\n\nHearing: {hearing.Date} at {hearing.Time}, {hearing.Location}\n\n" +
+                   "This is a demo email — no real SMTP is configured yet.";
+
+        // Dummy send (logs + records a SentEmail row); no real SMTP configured.
+        foreach (var to in recipients)
+            await _emailService.SendAsync(to, subject, body, hearing.CaseId);
+
+        // Append to the hearing's notification log so the UI can show who was notified.
+        hearing.EmailNotifications = new List<HearingEmailNotification>(hearing.EmailNotifications)
+        {
+            new HearingEmailNotification
+            {
+                Recipients = recipients,
+                Subject = subject,
+                Message = request.Message.Trim(),
+                SentBy = sentByName,
+                SentAt = DateTime.UtcNow
+            }
+        };
+        hearing.UpdatedAt = DateTime.UtcNow;
+        _unitOfWork.Hearings.Update(hearing);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), $"Email sent to {recipients.Count} recipient(s).");
+    }
+
     private async Task NotifyHearingChangedAsync(Case c, Hearing hearing, string title)
     {
         var message = $"Hearing for case {c.CaseNumber} is on {hearing.Date} at {hearing.Time} ({hearing.Location}).";

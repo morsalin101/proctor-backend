@@ -54,6 +54,7 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.AccusedPersons)
             .Include(c => c.Complainants)
             .Include(c => c.AssignedTo)
+            .Include(c => c.Assignments)
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

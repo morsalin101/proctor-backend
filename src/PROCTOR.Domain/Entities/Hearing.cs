@@ -13,5 +13,8 @@ public class Hearing : BaseEntity
     public string? Notes { get; set; }
     public string? Remarks { get; set; }
 
+    /// <summary>Log of external email notifications sent about this hearing.</summary>
+    public List<HearingEmailNotification> EmailNotifications { get; set; } = new();
+
     public Case Case { get; set; } = null!;
 }

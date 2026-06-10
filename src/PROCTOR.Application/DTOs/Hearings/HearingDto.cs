@@ -13,6 +13,16 @@ public class HearingDto
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string? Remarks { get; set; }
+    public List<HearingEmailNotificationDto> EmailNotifications { get; set; } = [];
+}
+
+public class HearingEmailNotificationDto
+{
+    public List<string> Recipients { get; set; } = [];
+    public string? Subject { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string SentBy { get; set; } = string.Empty;
+    public string SentAt { get; set; } = string.Empty;
 }
 
 public class UpcomingHearingsDto

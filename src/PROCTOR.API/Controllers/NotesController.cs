@@ -42,7 +42,10 @@ public class NotesController : ControllerBase
             UpdatedAt = DateTime.UtcNow
         };
 
-        caseEntity.Notes.Add(note);
+        // Add via the context directly (note carries CaseId) rather than through the
+        // case's un-loaded Notes collection, which EF may not track — that left notes
+        // silently un-persisted so other users never saw them.
+        _unitOfWork.Add(note);
 
         var timelineEvent = new TimelineEvent
         {
@@ -55,7 +58,7 @@ public class NotesController : ControllerBase
             UpdatedAt = DateTime.UtcNow
         };
 
-        caseEntity.TimelineEvents.Add(timelineEvent);
+        _unitOfWork.Add(timelineEvent);
 
         await _unitOfWork.SaveChangesAsync();
 

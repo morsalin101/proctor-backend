@@ -25,6 +25,9 @@ public class HearingsController : ControllerBase
     private string GetCurrentUserRole() =>
         User.FindFirst("role")?.Value ?? "";
 
+    private string GetCurrentUserName() =>
+        User.FindFirst("name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? "System";
+
     [HttpGet]
     public async Task<IActionResult> GetHearings([FromQuery] Guid? caseId)
     {
@@ -76,6 +79,16 @@ public class HearingsController : ControllerBase
     public async Task<IActionResult> UpdateHearing(Guid id, [FromBody] UpdateHearingRequest request)
     {
         var response = await _hearingService.UpdateHearingAsync(id, request);
+        if (!response.Success)
+            return BadRequest(response);
+
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/notify-email")]
+    public async Task<IActionResult> SendHearingEmail(Guid id, [FromBody] NotifyHearingEmailRequest request)
+    {
+        var response = await _hearingService.SendHearingEmailAsync(id, request, GetCurrentUserName());
         if (!response.Success)
             return BadRequest(response);
 
