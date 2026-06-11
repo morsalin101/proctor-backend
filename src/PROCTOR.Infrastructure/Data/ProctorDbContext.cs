@@ -31,6 +31,7 @@ public class ProctorDbContext : DbContext
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<CaseAdditionalInfo> CaseAdditionalInfos => Set<CaseAdditionalInfo>();
+    public DbSet<CaseSubject> CaseSubjects => Set<CaseSubject>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
