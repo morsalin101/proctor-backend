@@ -36,14 +36,14 @@ public class CaseService : ICaseService
     }
 
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetCasesAsync(
-        string? status, string? type, string? priority, string? search, int page, int pageSize)
+        string? status, string? type, string? priority, string? search, int page, int pageSize, string? userRole = null)
     {
         CaseStatus? statusEnum = status is not null ? MappingExtensions.ParseEnum<CaseStatus>(status) : null;
         CaseType? typeEnum = type is not null ? MappingExtensions.ParseEnum<CaseType>(type) : null;
         Priority? priorityEnum = priority is not null ? MappingExtensions.ParseEnum<Priority>(priority) : null;
 
-        var cases = await _unitOfWork.Cases.GetFilteredAsync(statusEnum, typeEnum, priorityEnum, search, page, pageSize);
-        var totalCount = await _unitOfWork.Cases.GetFilteredCountAsync(statusEnum, typeEnum, priorityEnum, search);
+        var cases = await _unitOfWork.Cases.GetFilteredAsync(statusEnum, typeEnum, priorityEnum, search, page, pageSize, userRole);
+        var totalCount = await _unitOfWork.Cases.GetFilteredCountAsync(statusEnum, typeEnum, priorityEnum, search, userRole);
 
         var result = new PagedResult<CaseListDto>
         {
@@ -56,11 +56,26 @@ public class CaseService : ICaseService
         return ApiResponse<PagedResult<CaseListDto>>.SuccessResponse(result);
     }
 
-    public async Task<ApiResponse<CaseDto>> GetCaseByIdAsync(Guid id)
+    // A case is on the "female track" (handled only by the Female Coordinator) when the
+    // complainant is female or the case is confidential.
+    public static bool IsFemaleTrack(Case c) => c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female;
+
+    // The two coordinator roles are gender-separated; every other role is unaffected.
+    private static bool CoordinatorMayView(string? role, Case c)
+    {
+        if (role == "coordinator") return !IsFemaleTrack(c);        // male coordinator: never female-track
+        if (role == "female-coordinator") return IsFemaleTrack(c);  // female coordinator: only female-track
+        return true;
+    }
+
+    public async Task<ApiResponse<CaseDto>> GetCaseByIdAsync(Guid id, string? userRole = null)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
+
+        if (!CoordinatorMayView(userRole, c))
+            return ApiResponse<CaseDto>.FailResponse("You don't have access to this case.");
 
         return ApiResponse<CaseDto>.SuccessResponse(c.ToDto());
     }
@@ -110,7 +125,10 @@ public class CaseService : ICaseService
             AccusedGuardianContact = request.AccusedGuardianContact,
             VideoLink = request.VideoLink,
             IncidentDate = request.IncidentDate is not null ? DateTime.SpecifyKind(DateTime.Parse(request.IncidentDate), DateTimeKind.Utc) : null,
-            SubmittedByUserId = submittedByUserId
+            SubmittedByUserId = submittedByUserId,
+            SubmitterGender = string.IsNullOrWhiteSpace(request.Gender)
+                ? Gender.Unspecified
+                : MappingExtensions.ParseEnum<Gender>(request.Gender)
         };
 
         var timelineEvent = new TimelineEvent
@@ -152,27 +170,48 @@ public class CaseService : ICaseService
             }
         }
 
-        // Female-coordinator routing: if the submitter is female, route the case to the
-        // first active FemaleCoordinator user. This applies regardless of case type.
-        User? femaleCoordinator = null;
-        if (submittedByUserId.HasValue)
+        // Gender-based coordinator routing for non-Type-1 cases: the complainant's gender
+        // (chosen on the Type-2 form) decides which coordinator handles the case —
+        // female → female coordinator, male → (male) coordinator. Confidential always goes
+        // to a female coordinator. If no gender is supplied, fall back to the submitter's
+        // account gender so existing flows keep working.
+        User? routedCoordinator = null;
+        string? routedRole = null;
+        if (newCase.Type != CaseType.Type1)
         {
-            var submitter = await _unitOfWork.Users.GetByIdAsync(submittedByUserId.Value);
-            if (submitter?.Gender == Gender.Female)
+            var selectedGender = request.Gender?.Trim().ToLowerInvariant();
+            if (newCase.Type == CaseType.Confidential)
+                selectedGender = "female";
+            if (string.IsNullOrEmpty(selectedGender) && submittedByUserId.HasValue)
             {
-                var coordinators = await _unitOfWork.Users.FindAsync(u => u.Role == UserRole.FemaleCoordinator && u.IsActive);
-                femaleCoordinator = coordinators.FirstOrDefault();
+                var submitter = await _unitOfWork.Users.GetByIdAsync(submittedByUserId.Value);
+                if (submitter?.Gender == Gender.Female) selectedGender = "female";
+                else if (submitter?.Gender == Gender.Male) selectedGender = "male";
+            }
+
+            if (selectedGender == "female")
+            {
+                var fcs = await _unitOfWork.Users.FindAsync(u => u.Role == UserRole.FemaleCoordinator && u.IsActive);
+                routedCoordinator = fcs.FirstOrDefault();
+                routedRole = "female-coordinator";
+            }
+            else if (selectedGender == "male")
+            {
+                var cs = (await _unitOfWork.Users.FindAsync(u => u.Role == UserRole.Coordinator && u.IsActive)).ToList();
+                routedCoordinator = cs.FirstOrDefault(u => u.Gender == Gender.Male) ?? cs.FirstOrDefault();
+                routedRole = "coordinator";
             }
         }
 
-        if (femaleCoordinator is not null)
+        if (routedCoordinator is not null)
         {
-            newCase.AssignedToId = femaleCoordinator.Id;
+            newCase.AssignedToId = routedCoordinator.Id;
+            newCase.ForwardedToRole = routedRole;
             newCase.Assignments.Add(new CaseAssignment
             {
                 Id = Guid.NewGuid(),
                 CaseId = newCase.Id,
-                UserId = femaleCoordinator.Id,
+                UserId = routedCoordinator.Id,
                 AssignedById = submittedByUserId,
                 AssignedAt = DateTime.UtcNow,
                 IsActive = true,
@@ -184,10 +223,10 @@ public class CaseService : ICaseService
         await _unitOfWork.SaveChangesAsync();
 
         // Notifications
-        if (femaleCoordinator is not null)
+        if (routedCoordinator is not null)
         {
-            await _notificationService.CreateAsync(femaleCoordinator.Id, null, "New Case Auto-Routed",
-                $"Case {caseNumber} was auto-assigned to you (female student submitter).", newCase.Id);
+            await _notificationService.CreateAsync(routedCoordinator.Id, null, "New Case Auto-Routed",
+                $"Case {caseNumber} was auto-assigned to you.", newCase.Id);
         }
 
         if (newCase.Type == CaseType.Type1)
@@ -208,7 +247,7 @@ public class CaseService : ICaseService
                     $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
             }
 
-            if (targetRoles.Count > 0 && femaleCoordinator is null)
+            if (targetRoles.Count > 0)
             {
                 newCase.ForwardedToRole = targetRoles[0];
                 _unitOfWork.Cases.Update(newCase);
@@ -217,7 +256,8 @@ public class CaseService : ICaseService
         }
         else
         {
-            var targetRole = newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
+            // Notify the role queue too, so coordinators who aren't the specific assignee still see it.
+            var targetRole = routedRole ?? (newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator");
             await _notificationService.CreateAsync(null, targetRole, "New Case Submitted",
                 $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
         }
@@ -277,12 +317,14 @@ public class CaseService : ICaseService
             var order = 0;
             foreach (var cc in request.Complainants)
             {
-                c.Complainants.Add(new CaseComplainant
+                var comp = new CaseComplainant
                 {
                     Id = Guid.NewGuid(), CaseId = c.Id, Name = cc.Name, StudentId = cc.StudentId,
                     Department = cc.Department, Contact = cc.Contact, AdvisorName = cc.AdvisorName,
                     FatherName = cc.FatherName, FatherContact = cc.FatherContact, Order = order++
-                });
+                };
+                c.Complainants.Add(comp);
+                _unitOfWork.Add(comp); // force INSERT (client-set Guid key)
             }
         }
 
@@ -294,16 +336,21 @@ public class CaseService : ICaseService
             var order = 0;
             foreach (var a in request.AccusedPersons)
             {
-                c.AccusedPersons.Add(new CaseAccused
+                var acc = new CaseAccused
                 {
                     Id = Guid.NewGuid(), CaseId = c.Id, Name = a.Name,
                     AccusedStudentId = a.AccusedStudentId, Department = a.Department,
                     Contact = a.Contact, GuardianContact = a.GuardianContact, Order = order++
-                });
+                };
+                c.AccusedPersons.Add(acc);
+                _unitOfWork.Add(acc); // force INSERT (client-set Guid key)
             }
         }
 
-        _unitOfWork.Cases.Update(c);
+        // `c` is change-tracked; mutating it is enough. Do NOT force the whole graph to
+        // EntityState.Modified via Update() — that makes EF emit UPDATEs for the freshly
+        // added complainant/accused rows (which don't exist yet) → "affected 0 rows".
+        c.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Add(new TimelineEvent
         {
@@ -395,7 +442,7 @@ public class CaseService : ICaseService
             var existing = c.Assignments.FirstOrDefault(a => a.UserId == uid);
             if (existing is null)
             {
-                c.Assignments.Add(new CaseAssignment
+                var assignment = new CaseAssignment
                 {
                     Id = Guid.NewGuid(),
                     CaseId = c.Id,
@@ -404,7 +451,12 @@ public class CaseService : ICaseService
                     AssignedAt = DateTime.UtcNow,
                     IsActive = true,
                     IsPrimary = primaryGuid.HasValue ? uid == primaryGuid.Value : false
-                });
+                };
+                c.Assignments.Add(assignment);
+                // Force the new row to be tracked as Added → INSERT. Adding it only through the
+                // parent's navigation collection lets EF treat the client-set Guid key as an
+                // existing row and emit an UPDATE that matches 0 rows (the reported 500).
+                _unitOfWork.Add(assignment);
             }
             else
             {

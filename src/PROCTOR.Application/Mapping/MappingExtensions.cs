@@ -128,7 +128,15 @@ public static class MappingExtensions
         Notes = c.Notes.OrderByDescending(n => n.CreatedAt).Select(n => n.ToDto()).ToList(),
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
         Timeline = c.TimelineEvents.OrderByDescending(t => t.CreatedAt).Select(t => t.ToDto()).ToList(),
-        Reports = c.Reports.Select(r => r.ToDto()).ToList()
+        Reports = c.Reports.Select(r => r.ToDto()).ToList(),
+        AdditionalInfos = c.AdditionalInfos.OrderByDescending(a => a.CreatedAt).Select(a => new AdditionalInfoDto
+        {
+            Id = a.Id.ToString(),
+            Content = a.Content,
+            Author = a.Author,
+            AuthorRole = a.AuthorRole,
+            CreatedDate = a.CreatedAt.ToString("o")
+        }).ToList()
     };
 
     public static CaseAssignmentDto ToDto(this CaseAssignment a) => new()

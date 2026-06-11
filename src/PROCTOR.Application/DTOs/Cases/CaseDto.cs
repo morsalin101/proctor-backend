@@ -64,4 +64,5 @@ public class CaseDto
     public List<HearingDto> Hearings { get; set; } = [];
     public List<RecentActivityDto> Timeline { get; set; } = [];
     public List<ReportDto> Reports { get; set; } = [];
+    public List<AdditionalInfoDto> AdditionalInfos { get; set; } = [];
 }

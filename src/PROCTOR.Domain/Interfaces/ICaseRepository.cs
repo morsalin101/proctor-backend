@@ -7,8 +7,8 @@ namespace PROCTOR.Domain.Interfaces;
 public interface ICaseRepository : IRepository<Case>
 {
     Task<Case?> GetByIdWithDetailsAsync(Guid id);
-    Task<IEnumerable<Case>> GetFilteredAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search, int page, int pageSize);
-    Task<int> GetFilteredCountAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search);
+    Task<IEnumerable<Case>> GetFilteredAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search, int page, int pageSize, string? userRole = null);
+    Task<int> GetFilteredCountAsync(CaseStatus? status, CaseType? type, Priority? priority, string? search, string? userRole = null);
     Task<string> GenerateCaseNumberAsync();
     Task<IEnumerable<Case>> FindWithDetailsAsync(Expression<Func<Case, bool>> predicate);
 }

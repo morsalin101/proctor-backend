@@ -5,11 +5,11 @@ namespace PROCTOR.Application.Interfaces;
 
 public interface IHearingService
 {
-    Task<ApiResponse<List<HearingDto>>> GetHearingsAsync(Guid? caseId);
+    Task<ApiResponse<List<HearingDto>>> GetHearingsAsync(Guid? caseId, string? userRole = null);
     Task<ApiResponse<HearingDto>> GetHearingByIdAsync(Guid id);
     Task<ApiResponse<HearingDto>> CreateHearingAsync(CreateHearingRequest request);
     Task<ApiResponse<HearingDto>> UpdateHearingAsync(Guid id, UpdateHearingRequest request);
     Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status);
-    Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId);
+    Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId, string? userRole = null);
     Task<ApiResponse<HearingDto>> SendHearingEmailAsync(Guid id, NotifyHearingEmailRequest request, string sentByName);
 }

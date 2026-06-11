@@ -17,6 +17,11 @@ public class Case : BaseEntity
     public string? ForwardedToRole { get; set; }
     public Guid? SubmittedByUserId { get; set; }
 
+    // Complainant gender chosen on the Type-2 form. Drives the coordinator track:
+    // Female (or any confidential case) is handled only by the Female Coordinator and is
+    // hidden from the (male) Coordinator; Male is handled by the Coordinator.
+    public Gender SubmitterGender { get; set; } = Gender.Unspecified;
+
     // Type-2 form fields
     public string? StudentDepartment { get; set; }
     public string? StudentContact { get; set; }
@@ -57,4 +62,5 @@ public class Case : BaseEntity
     public ICollection<CaseVerification> Verifications { get; set; } = new List<CaseVerification>();
     public ICollection<CaseComplainant> Complainants { get; set; } = new List<CaseComplainant>();
     public ICollection<CaseAccused> AccusedPersons { get; set; } = new List<CaseAccused>();
+    public ICollection<CaseAdditionalInfo> AdditionalInfos { get; set; } = new List<CaseAdditionalInfo>();
 }

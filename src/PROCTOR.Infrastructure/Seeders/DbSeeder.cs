@@ -16,5 +16,6 @@ public static class DbSeeder
         await ForwardingRuleSeeder.SeedAsync(context);
         await ForwardingRuleSeeder.SeedSpecialRulesAsync(context);
         await CaseCategorySeeder.SeedAsync(context);
+        await StudentSeeder.SeedAsync(context);
     }
 }

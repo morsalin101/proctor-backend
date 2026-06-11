@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PROCTOR.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PROCTOR.Infrastructure.Data;
 namespace PROCTOR.Infrastructure.Migrations
 {
     [DbContext(typeof(ProctorDbContext))]
-    partial class ProctorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260611051357_AddStudents")]
+    partial class AddStudents
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -165,10 +168,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<Guid?>("SubmittedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SubmitterGender")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text");
@@ -235,39 +234,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.HasIndex("CaseId");
 
                     b.ToTable("CaseAccusedPersons");
-                });
-
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAdditionalInfo", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Author")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("AuthorRole")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("CaseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CaseId");
-
-                    b.ToTable("CaseAdditionalInfos");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAssignment", b =>
@@ -1086,17 +1052,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Navigation("Case");
                 });
 
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAdditionalInfo", b =>
-                {
-                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
-                        .WithMany("AdditionalInfos")
-                        .HasForeignKey("CaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Case");
-                });
-
             modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAssignment", b =>
                 {
                     b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
@@ -1235,8 +1190,6 @@ namespace PROCTOR.Infrastructure.Migrations
             modelBuilder.Entity("PROCTOR.Domain.Entities.Case", b =>
                 {
                     b.Navigation("AccusedPersons");
-
-                    b.Navigation("AdditionalInfos");
 
                     b.Navigation("Assignments");
 

@@ -47,14 +47,14 @@ public class CasesController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        var response = await _caseService.GetCasesAsync(status, type, priority, search, page, pageSize);
+        var response = await _caseService.GetCasesAsync(status, type, priority, search, page, pageSize, GetCurrentUserRole());
         return Ok(response);
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetCaseById(Guid id)
     {
-        var response = await _caseService.GetCaseByIdAsync(id);
+        var response = await _caseService.GetCaseByIdAsync(id, GetCurrentUserRole());
         if (!response.Success)
             return NotFound(response);
 

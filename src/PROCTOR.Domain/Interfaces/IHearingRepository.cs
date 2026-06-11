@@ -6,4 +6,5 @@ public interface IHearingRepository : IRepository<Hearing>
 {
     Task<IEnumerable<Hearing>> GetByCaseIdAsync(Guid caseId);
     Task<Hearing?> GetByIdWithCaseAsync(Guid id);
+    Task<IEnumerable<Hearing>> GetAllWithCaseAsync();
 }

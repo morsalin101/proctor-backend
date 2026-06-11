@@ -22,16 +22,32 @@ public class HearingService : IHearingService
         _emailService = emailService;
     }
 
-    public async Task<ApiResponse<List<HearingDto>>> GetHearingsAsync(Guid? caseId)
+    // Female-track cases (female complainant or confidential) are kept on the Female
+    // Coordinator track and away from the (male) Coordinator.
+    private static bool IsFemaleTrack(Case? c) =>
+        c is not null && (c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
+
+    private static bool CoordinatorMayView(string? role, Case? c)
+    {
+        if (role == "coordinator") return !IsFemaleTrack(c);
+        if (role == "female-coordinator") return IsFemaleTrack(c);
+        return true;
+    }
+
+    public async Task<ApiResponse<List<HearingDto>>> GetHearingsAsync(Guid? caseId, string? userRole = null)
     {
         IEnumerable<Hearing> hearings;
 
         if (caseId.HasValue)
             hearings = await _unitOfWork.Hearings.GetByCaseIdAsync(caseId.Value);
         else
-            hearings = await _unitOfWork.Hearings.GetAllAsync();
+            hearings = await _unitOfWork.Hearings.GetAllWithCaseAsync();
 
-        var dtos = hearings.Select(h => h.ToDto()).ToList();
+        // Hide female-track hearings from the male Coordinator (and vice-versa).
+        var dtos = hearings
+            .Where(h => CoordinatorMayView(userRole, h.Case))
+            .Select(h => h.ToDto())
+            .ToList();
         return ApiResponse<List<HearingDto>>.SuccessResponse(dtos);
     }
 
@@ -147,7 +163,7 @@ public class HearingService : IHearingService
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing status updated successfully.");
     }
 
-    public async Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId)
+    public async Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId, string? userRole = null)
     {
         var allHearings = await _unitOfWork.Hearings.GetAllAsync();
         var today = DateTime.UtcNow.Date;
@@ -175,6 +191,11 @@ public class HearingService : IHearingService
             }
 
             var hearingWithCase = await _unitOfWork.Hearings.GetByIdWithCaseAsync(h.Id);
+
+            // Keep female-track hearings away from the male Coordinator (and vice-versa).
+            if (!CoordinatorMayView(userRole, hearingWithCase?.Case))
+                continue;
+
             var dto = (hearingWithCase ?? h).ToDto();
 
             var dateOnly = hDate.Date;

@@ -23,4 +23,12 @@ public class HearingRepository : Repository<Hearing>, IHearingRepository
             .Include(h => h.Case)
             .FirstOrDefaultAsync(h => h.Id == id);
     }
+
+    public async Task<IEnumerable<Hearing>> GetAllWithCaseAsync()
+    {
+        return await _dbSet
+            .Include(h => h.Case)
+            .OrderByDescending(h => h.CreatedAt)
+            .ToListAsync();
+    }
 }

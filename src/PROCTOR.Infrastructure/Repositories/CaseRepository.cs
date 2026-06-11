@@ -35,6 +35,7 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Complainants)
             .Include(c => c.AccusedPersons)
             .Include(c => c.Category)
+            .Include(c => c.AdditionalInfos)
             .Include(c => c.Assignments).ThenInclude(a => a.User)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
@@ -45,9 +46,10 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         Priority? priority,
         string? search,
         int page,
-        int pageSize)
+        int pageSize,
+        string? userRole = null)
     {
-        var query = ApplyFilters(status, type, priority, search);
+        var query = ApplyFilters(status, type, priority, search, userRole);
 
         return await query
             .Include(c => c.Category)
@@ -65,9 +67,10 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         CaseStatus? status,
         CaseType? type,
         Priority? priority,
-        string? search)
+        string? search,
+        string? userRole = null)
     {
-        var query = ApplyFilters(status, type, priority, search);
+        var query = ApplyFilters(status, type, priority, search, userRole);
         return await query.CountAsync();
     }
 
@@ -95,9 +98,18 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         CaseStatus? status,
         CaseType? type,
         Priority? priority,
-        string? search)
+        string? search,
+        string? userRole = null)
     {
         var query = _dbSet.AsQueryable();
+
+        // Gender-separated coordinator tracks: the male Coordinator never sees female-track
+        // cases (female complainant or confidential), and the Female Coordinator only sees
+        // those. Every other role is unaffected.
+        if (userRole == "coordinator")
+            query = query.Where(c => !(c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female));
+        else if (userRole == "female-coordinator")
+            query = query.Where(c => c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
 
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);

@@ -8,6 +8,10 @@ public class CreateCaseRequest
     public string Priority { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
 
+    // Type-2: gender of the complainant, chosen on the form. Routes the case to a
+    // matching coordinator (female → female coordinator, male → coordinator).
+    public string? Gender { get; set; }
+
     // Category (admin-managed). For Type-2 submissions this drives confidentiality.
     public string? CategoryId { get; set; }
 

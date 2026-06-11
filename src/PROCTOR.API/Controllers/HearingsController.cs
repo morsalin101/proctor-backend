@@ -31,7 +31,7 @@ public class HearingsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetHearings([FromQuery] Guid? caseId)
     {
-        var response = await _hearingService.GetHearingsAsync(caseId);
+        var response = await _hearingService.GetHearingsAsync(caseId, GetCurrentUserRole());
         return Ok(response);
     }
 
@@ -51,7 +51,7 @@ public class HearingsController : ControllerBase
             }
         }
 
-        var response = await _hearingService.GetUpcomingHearingsAsync(filterUserId);
+        var response = await _hearingService.GetUpcomingHearingsAsync(filterUserId, GetCurrentUserRole());
         return Ok(response);
     }
 

@@ -26,6 +26,9 @@ public class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.Priority)
             .HasConversion<string>();
 
+        builder.Property(c => c.SubmitterGender)
+            .HasConversion<string>();
+
         builder.HasOne(c => c.AssignedTo)
             .WithMany()
             .HasForeignKey(c => c.AssignedToId)
@@ -69,6 +72,11 @@ public class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.HasMany(c => c.AccusedPersons)
             .WithOne(ca => ca.Case)
             .HasForeignKey(ca => ca.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(c => c.AdditionalInfos)
+            .WithOne(ai => ai.Case)
+            .HasForeignKey(ai => ai.CaseId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(c => c.Verdict).HasMaxLength(2000);
