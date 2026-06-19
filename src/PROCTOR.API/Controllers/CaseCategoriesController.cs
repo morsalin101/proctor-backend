@@ -34,7 +34,7 @@ public class CaseCategoriesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "super-admin,coordinator")]
+    [Authorize(Roles = "super-admin,coordinator,female-coordinator,proctor")]
     public async Task<IActionResult> Create([FromBody] CreateCaseCategoryRequest request)
     {
         var result = await _service.CreateAsync(request);
@@ -43,7 +43,7 @@ public class CaseCategoriesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "super-admin,coordinator")]
+    [Authorize(Roles = "super-admin,coordinator,female-coordinator,proctor")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCaseCategoryRequest request)
     {
         var result = await _service.UpdateAsync(id, request);
@@ -52,7 +52,7 @@ public class CaseCategoriesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "super-admin,coordinator")]
+    [Authorize(Roles = "super-admin,coordinator,female-coordinator,proctor")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _service.DeleteAsync(id);

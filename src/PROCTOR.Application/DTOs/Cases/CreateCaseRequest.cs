@@ -21,6 +21,7 @@ public class CreateCaseRequest
     public string? IncidentLocationDescription { get; set; }
 
     // Type-2 form fields
+    public string? Subject { get; set; }
     public string? StudentDepartment { get; set; }
     public string? StudentContact { get; set; }
     public string? StudentAdvisorName { get; set; }

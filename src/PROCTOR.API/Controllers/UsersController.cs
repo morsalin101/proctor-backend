@@ -73,7 +73,7 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {
         var role = GetCurrentUserRole();
-        if (role != "super-admin" && role != "proctor")
+        if (role != "super-admin" && role != "proctor" && role != "coordinator" && role != "female-coordinator")
             return Forbid();
 
         var response = await _userService.CreateUserAsync(request);

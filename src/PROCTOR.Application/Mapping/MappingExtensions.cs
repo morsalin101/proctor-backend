@@ -87,6 +87,7 @@ public static class MappingExtensions
         StudentName = c.StudentName,
         StudentId = c.StudentId,
         Type = c.Type.ToKebabCase(),
+        Subject = c.Subject,
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
@@ -136,6 +137,16 @@ public static class MappingExtensions
             Author = a.Author,
             AuthorRole = a.AuthorRole,
             CreatedDate = a.CreatedAt.ToString("o")
+        }).ToList(),
+        HearingPersons = c.HearingPersons.OrderBy(p => p.AddedAt).Select(p => new CaseHearingPersonDto
+        {
+            Id = p.Id,
+            Type = p.Type,
+            Name = p.Name,
+            Email = p.Email,
+            UserId = p.UserId,
+            Role = p.Role,
+            AddedAt = p.AddedAt.ToString("o")
         }).ToList()
     };
 

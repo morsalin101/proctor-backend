@@ -42,9 +42,10 @@ public class HearingsController : ControllerBase
         if (mineOnly)
         {
             var role = GetCurrentUserRole();
-            // Coordinators / super-admin see everyone's upcoming hearings.
+            // Coordinators / proctors / super-admin see everyone's upcoming hearings
+            // (coordinators are still gender-filtered downstream in HearingService).
             // Anyone else is filtered to their own assignments.
-            if (role != "coordinator" && role != "super-admin")
+            if (role != "coordinator" && role != "female-coordinator" && role != "proctor" && role != "super-admin")
             {
                 if (Guid.TryParse(GetCurrentUserId(), out var uid))
                     filterUserId = uid;

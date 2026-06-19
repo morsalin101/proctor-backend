@@ -30,16 +30,11 @@ public static class MenuPermissionSeeder
             ["settings"] = "RU"
         });
 
-        AddPermissions(permissions, UserRole.Coordinator, new Dictionary<string, string>
-        {
-            ["dashboard"] = "R",
-            ["submit"] = "CR",
-            ["incidents"] = "R",
-            ["cases"] = "RU",
-            ["my-cases"] = "R",
-            ["notifications"] = "R",
-            ["settings"] = "RU"
-        });
+        // Coordinator mirrors Proctor's full access (combined power) EXCEPT the dedicated
+        // "confidential" menu — confidential / female-complainant cases stay on the Female
+        // Coordinator's gender-separated track. Case visibility is still gender-filtered in
+        // CaseRepository / CaseService (the male coordinator never sees the female track).
+        AddFullCrudPermissions(permissions, UserRole.Coordinator, "confidential");
 
         AddFullCrudPermissions(permissions, UserRole.Proctor);
 
@@ -87,15 +82,9 @@ public static class MenuPermissionSeeder
             ["settings"] = "RU"
         });
 
-        AddPermissions(permissions, UserRole.FemaleCoordinator, new Dictionary<string, string>
-        {
-            ["dashboard"] = "R",
-            ["cases"] = "RU",
-            ["my-cases"] = "R",
-            ["notifications"] = "R",
-            ["confidential"] = "CRUD",
-            ["settings"] = "RU"
-        });
+        // Female Coordinator mirrors Proctor's full access too (combined power), keeping the
+        // "confidential" menu. Her case visibility stays restricted to the female track.
+        AddFullCrudPermissions(permissions, UserRole.FemaleCoordinator);
 
         AddPermissions(permissions, UserRole.SexualHarassmentCommittee, new Dictionary<string, string>
         {
@@ -193,12 +182,14 @@ public static class MenuPermissionSeeder
         }
     }
 
-    private static void AddFullCrudPermissions(List<MenuPermission> permissions, UserRole role)
+    private static void AddFullCrudPermissions(List<MenuPermission> permissions, UserRole role, params string[] excludeMenuKeys)
     {
         var roleId = RoleSeeder.GetDeterministicGuid(role);
 
         foreach (var menuKey in AllMenuKeys)
         {
+            if (excludeMenuKeys.Contains(menuKey)) continue;
+
             permissions.Add(new MenuPermission
             {
                 Id = Guid.NewGuid(),

@@ -23,6 +23,7 @@ public class Case : BaseEntity
     public Gender SubmitterGender { get; set; } = Gender.Unspecified;
 
     // Type-2 form fields
+    public string? Subject { get; set; }
     public string? StudentDepartment { get; set; }
     public string? StudentContact { get; set; }
     public string? StudentAdvisorName { get; set; }
@@ -63,4 +64,7 @@ public class Case : BaseEntity
     public ICollection<CaseComplainant> Complainants { get; set; } = new List<CaseComplainant>();
     public ICollection<CaseAccused> AccusedPersons { get; set; } = new List<CaseAccused>();
     public ICollection<CaseAdditionalInfo> AdditionalInfos { get; set; } = new List<CaseAdditionalInfo>();
+
+    /// <summary>Hearing panel members (internal users + external emailed people). Stored as jsonb.</summary>
+    public List<CaseHearingPerson> HearingPersons { get; set; } = new();
 }

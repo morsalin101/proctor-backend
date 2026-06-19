@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PROCTOR.Domain.Entities;
 
@@ -9,6 +11,18 @@ public class CaseConfiguration : IEntityTypeConfiguration<Case>
     public void Configure(EntityTypeBuilder<Case> builder)
     {
         builder.HasKey(c => c.Id);
+
+        builder.Property(c => c.HearingPersons)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => string.IsNullOrWhiteSpace(v)
+                    ? new List<CaseHearingPerson>()
+                    : JsonSerializer.Deserialize<List<CaseHearingPerson>>(v, (JsonSerializerOptions?)null) ?? new(),
+                new ValueComparer<List<CaseHearingPerson>>(
+                    (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+                    v => v == null ? 0 : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+                    v => JsonSerializer.Deserialize<List<CaseHearingPerson>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new()))
+            .HasColumnType("jsonb");
 
         builder.Property(c => c.CaseNumber)
             .IsRequired()

@@ -113,6 +113,7 @@ public class CaseService : ICaseService
             IncidentLatitude = request.IncidentLatitude,
             IncidentLongitude = request.IncidentLongitude,
             IncidentLocationDescription = request.IncidentLocationDescription,
+            Subject = request.Subject,
             StudentDepartment = request.StudentDepartment,
             StudentContact = request.StudentContact,
             StudentAdvisorName = request.StudentAdvisorName,
@@ -403,9 +404,11 @@ public class CaseService : ICaseService
 
         if (c.SubmittedByUserId.HasValue)
         {
-            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, "student",
-                "Case Acknowledged",
-                $"Your case {c.CaseNumber} has been acknowledged: {request.Comment}", c.Id);
+            var msg = string.IsNullOrWhiteSpace(request.Comment)
+                ? $"Your case {c.CaseNumber} has been acknowledged by {userName} (Proctor)."
+                : $"Message from {userName} (Proctor) on {c.CaseNumber}: \"{request.Comment}\"";
+            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
+                "Case Acknowledged — Message from Proctor", msg, c.Id);
         }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);

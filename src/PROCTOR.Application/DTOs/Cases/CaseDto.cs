@@ -13,6 +13,7 @@ public class CaseDto
     public string StudentName { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+    public string? Subject { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public string? AssignedTo { get; set; }
@@ -65,4 +66,5 @@ public class CaseDto
     public List<RecentActivityDto> Timeline { get; set; } = [];
     public List<ReportDto> Reports { get; set; } = [];
     public List<AdditionalInfoDto> AdditionalInfos { get; set; } = [];
+    public List<CaseHearingPersonDto> HearingPersons { get; set; } = [];
 }

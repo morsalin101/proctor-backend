@@ -23,9 +23,10 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.Submitted, CaseStatus.OnHold), new() { "coordinator", "female-coordinator" } },
         { (CaseStatus.Submitted, CaseStatus.ResubmissionRequested), new() { "coordinator", "female-coordinator" } },
 
-        // Type-1 quick actions (Coordinator/Proctor/Deputy/Assistant can close or suggest as Type-2)
+        // Type-1 quick actions (Coordinator/Proctor/Deputy/Assistant can close, suggest as Type-2, or escalate to police)
         { (CaseStatus.Submitted, CaseStatus.SuggestedType2), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.Submitted, CaseStatus.Closed), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
+        { (CaseStatus.Submitted, CaseStatus.PoliceCase), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.Verified, CaseStatus.Closed), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.SuggestedType2, CaseStatus.Closed), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.ResubmissionRequested, CaseStatus.Submitted), new() { "student" } },
