@@ -1,10 +1,11 @@
+using Microsoft.Extensions.Logging;
 using PROCTOR.Infrastructure.Data;
 
 namespace PROCTOR.Infrastructure.Seeders;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(ProctorDbContext context)
+    public static async Task SeedAsync(ProctorDbContext context, ILogger logger)
     {
         await RoleSeeder.SeedAsync(context);
         await UserSeeder.SeedAsync(context);
@@ -18,5 +19,9 @@ public static class DbSeeder
         await CaseCategorySeeder.SeedAsync(context);
         await StudentSeeder.SeedAsync(context);
         await CaseSubjectSeeder.SeedAsync(context);
+
+        // One-shot data hygiene: delete notifications whose case has been removed.
+        // Self-guarded by a SystemSetting flag — safe to run on every startup.
+        await NotificationCleanup.CleanupOrphanedAsync(context, logger);
     }
 }
