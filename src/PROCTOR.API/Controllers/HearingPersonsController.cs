@@ -17,11 +17,16 @@ public class HearingPersonsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
 
-    public HearingPersonsController(IUnitOfWork unitOfWork, IEmailService emailService)
+    public HearingPersonsController(
+        IUnitOfWork unitOfWork,
+        IEmailService emailService,
+        INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _emailService = emailService;
+        _notificationService = notificationService;
     }
 
     private static CaseHearingPersonDto ToDto(CaseHearingPerson p) => new()
@@ -59,6 +64,15 @@ public class HearingPersonsController : ControllerBase
         c.HearingPersons = new List<CaseHearingPerson>(c.HearingPersons) { person };
         c.UpdatedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync();
+
+        // Notify the added person so they know they've been pulled onto the panel
+        // (matches the "external" path which emails recipients right away).
+        await _notificationService.CreateAsync(
+            user.Id,
+            null,
+            "Added to Hearing Panel",
+            $"You have been added to the hearing panel for case {c.CaseNumber}.",
+            c.Id);
 
         return Ok(ApiResponse<CaseHearingPersonDto>.SuccessResponse(ToDto(person), "Person added to hearing panel."));
     }

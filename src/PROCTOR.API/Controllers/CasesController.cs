@@ -146,6 +146,13 @@ public class CasesController : ControllerBase
     [HttpPost("{id:guid}/reports")]
     public async Task<IActionResult> CreateReport(Guid id, [FromBody] CreateReportRequest request)
     {
+        // Draft report permission is dynamic: a role may create draft reports only if it has
+        // the __draft_report__ special forwarding permission (configured in Settings → Forwarding).
+        var role = GetCurrentUserRole();
+        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role);
+        if (!(special.Data?.CanDraftReport ?? false))
+            return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have draft report permission."));
+
         var createdByName = GetCurrentUserName();
         var userIdStr = GetCurrentUserId();
         var createdById = Guid.TryParse(userIdStr, out var uid) ? uid : Guid.Empty;

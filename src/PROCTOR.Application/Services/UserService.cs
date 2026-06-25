@@ -121,30 +121,15 @@ public class UserService : IUserService
 
     public async Task<ApiResponse<List<UserDto>>> GetForwardableUsersAsync(string fromRole)
     {
-        // The active forwarding rules ARE the forward permissions: whichever roles
-        // `fromRole` may forward to determine whose members appear in the dropdown.
-        // GetRulesForRoleAsync already excludes the internal __close__/__hearing__ rules.
-        var rulesResponse = await _forwardingRuleService.GetRulesForRoleAsync(fromRole);
-        var targetRoles = (rulesResponse.Data ?? new())
-            .Where(r => r.IsActive)
-            .Select(r => r.ToRole)
-            .Distinct()
-            .ToList();
+        // The forwarding dropdown shows every active staff member — coordinators,
+        // proctors, deputy-proctors, registrars, committees, etc. — so the case can
+        // be handed to anyone with the right to act on it. Students are excluded
+        // because they are not staff and have no case-handling role.
+        // (The forwarding rules are still consulted at the *route* level by
+        // CaseService.ForwardCaseAsync; this endpoint only feeds the picker UI.)
+        _ = fromRole; // kept for backwards compatibility with existing callers
 
-        if (targetRoles.Count == 0)
-            return ApiResponse<List<UserDto>>.SuccessResponse(new List<UserDto>());
-
-        var roleEnums = new List<UserRole>();
-        foreach (var role in targetRoles)
-        {
-            if (Enum.TryParse<UserRole>(role.Replace("-", ""), true, out var parsed))
-                roleEnums.Add(parsed);
-        }
-
-        if (roleEnums.Count == 0)
-            return ApiResponse<List<UserDto>>.SuccessResponse(new List<UserDto>());
-
-        var users = await _unitOfWork.Users.FindAsync(u => roleEnums.Contains(u.Role) && u.IsActive);
+        var users = await _unitOfWork.Users.FindAsync(u => u.Role != UserRole.Student && u.IsActive);
         var dtos = users
             .Select(u => u.ToDto())
             .OrderBy(u => u.Role)

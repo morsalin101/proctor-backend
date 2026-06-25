@@ -230,6 +230,13 @@ public class CaseService : ICaseService
                 $"Case {caseNumber} was auto-assigned to you.", newCase.Id);
         }
 
+        // Proctor always gets a heads-up on every submission — they oversee the
+        // whole process even when the case is routed elsewhere, so they need the
+        // full feed rather than only the cases forwarded directly to them.
+        await _notificationService.CreateAsync(null, "proctor",
+            newCase.Type == CaseType.Type1 ? "New Type-1 Incident" : "New Case Submitted",
+            $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+
         if (newCase.Type == CaseType.Type1)
         {
             var settingResp = await _systemSettingService.GetSettingByKeyAsync("type1_forwarding_roles");
