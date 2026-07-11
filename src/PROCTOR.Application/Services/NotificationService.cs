@@ -54,6 +54,25 @@ public class NotificationService : INotificationService
             .ToList();
     }
 
+    public async Task<List<NotificationDto>> GetByCaseForUserAsync(Guid caseId, Guid userId, string role)
+    {
+        var notifications = await _notificationRepository.FindAsync(n =>
+            n.CaseId == caseId && (n.UserId == userId || n.Role == role));
+
+        return notifications
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => new NotificationDto
+            {
+                Id = n.Id.ToString(),
+                Title = n.Title,
+                Message = n.Message,
+                IsRead = n.IsRead,
+                CaseId = n.CaseId?.ToString(),
+                CreatedAt = n.CreatedAt.ToString("o")
+            })
+            .ToList();
+    }
+
     public async Task MarkAsReadAsync(Guid notificationId)
     {
         var notification = await _notificationRepository.GetByIdAsync(notificationId);

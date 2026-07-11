@@ -69,7 +69,8 @@ public class HearingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateHearing([FromBody] CreateHearingRequest request)
     {
-        var response = await _hearingService.CreateHearingAsync(request);
+        Guid? createdById = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : null;
+        var response = await _hearingService.CreateHearingAsync(request, createdById, GetCurrentUserName());
         if (!response.Success)
             return BadRequest(response);
 
@@ -99,7 +100,8 @@ public class HearingsController : ControllerBase
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateHearingStatus(Guid id, [FromBody] UpdateHearingStatusRequest request)
     {
-        var response = await _hearingService.UpdateHearingStatusAsync(id, request.Status);
+        Guid? actingUserId = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : null;
+        var response = await _hearingService.UpdateHearingStatusAsync(id, request.Status, actingUserId);
         if (!response.Success)
             return BadRequest(response);
 

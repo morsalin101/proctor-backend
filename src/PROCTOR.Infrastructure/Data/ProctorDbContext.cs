@@ -42,6 +42,10 @@ public class ProctorDbContext : DbContext
         {
             b.HasIndex(x => x.Name).IsUnique();
             b.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            b.HasOne(x => x.Subject)
+                .WithMany()
+                .HasForeignKey(x => x.SubjectId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CaseAssignment>(b =>

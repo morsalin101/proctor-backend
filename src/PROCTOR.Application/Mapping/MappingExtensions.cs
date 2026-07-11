@@ -169,7 +169,8 @@ public static class MappingExtensions
         IsConfidential = c.IsConfidential,
         IsActive = c.IsActive,
         AppliesToType = c.AppliesToType.ToKebabCase(),
-        SortOrder = c.SortOrder
+        SortOrder = c.SortOrder,
+        SubjectId = c.SubjectId?.ToString()
     };
 
     public static CaseListDto ToListDto(this Case c) => new()
@@ -232,6 +233,8 @@ public static class MappingExtensions
         Status = h.Status.ToKebabCase(),
         Notes = h.Notes,
         Remarks = h.Remarks,
+        CreatedById = h.CreatedById?.ToString(),
+        CreatedByName = h.CreatedByName,
         EmailNotifications = h.EmailNotifications
             .OrderByDescending(n => n.SentAt)
             .Select(n => new HearingEmailNotificationDto

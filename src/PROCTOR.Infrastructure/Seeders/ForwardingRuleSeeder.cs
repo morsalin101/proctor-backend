@@ -12,16 +12,34 @@ public static class ForwardingRuleSeeder
 
         var rules = new List<ForwardingRule>
         {
+            // Coordinator can hand off to any staff role (matches the forwardable-users
+            // dropdown which lists every non-student). Each rule has an explicit
+            // ResultStatus so it shows up in Settings → Forwarding Rules.
             new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "proctor", ResultStatus = "assigned" },
-            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "assistant-proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "deputy-proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "registrar", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "disciplinary-committee", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "coordinator", ToRole = "sexual-harassment-committee", ResultStatus = "assigned" },
+            // Female-coordinator mirrors coordinator (with the gender-routed confidential path)
+            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "assistant-proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "deputy-proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "registrar", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "disciplinary-committee", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "female-coordinator", ToRole = "sexual-harassment-committee", ResultStatus = "assigned" },
+            // Proctor + Deputy + Assistant <-> each other + committees + registrar
             new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "assistant-proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "deputy-proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "registrar", ResultStatus = "forwarded-to-registrar" },
+            new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "disciplinary-committee", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "deputy-proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "registrar", ResultStatus = "forwarded-to-registrar" },
             new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "assistant-proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "proctor", ResultStatus = "assigned" },
+            new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "registrar", ResultStatus = "forwarded-to-registrar" },
+            new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "disciplinary-committee", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "registrar", ToRole = "proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "registrar", ToRole = "disciplinary-committee", ResultStatus = "forwarded-to-committee" },
             new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "assistant-proctor", ResultStatus = "assigned" },

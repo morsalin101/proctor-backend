@@ -51,6 +51,15 @@ public class CasesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("next-number")]
+    public async Task<IActionResult> GetNextCaseNumber()
+    {
+        // Peek the next case number for the pre-submit report preview. Not reserved — the
+        // real number is generated on create, so concurrent submissions may shift it.
+        var response = await _caseService.GetNextCaseNumberAsync();
+        return Ok(response);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetCaseById(Guid id)
     {

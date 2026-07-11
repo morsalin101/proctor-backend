@@ -60,7 +60,7 @@ public class HearingService : IHearingService
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto());
     }
 
-    public async Task<ApiResponse<HearingDto>> CreateHearingAsync(CreateHearingRequest request)
+    public async Task<ApiResponse<HearingDto>> CreateHearingAsync(CreateHearingRequest request, Guid? createdById = null, string? createdByName = null)
     {
         var caseId = Guid.Parse(request.CaseId);
         var existingCase = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
@@ -75,7 +75,9 @@ public class HearingService : IHearingService
             Time = request.Time,
             Location = request.Location,
             Participants = request.Participants,
-            Status = HearingStatus.Scheduled
+            Status = HearingStatus.Scheduled,
+            CreatedById = createdById,
+            CreatedByName = createdByName
         };
 
         await _unitOfWork.Hearings.AddAsync(hearing);
@@ -139,13 +141,25 @@ public class HearingService : IHearingService
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing updated successfully.");
     }
 
-    public async Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status)
+    public async Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status, Guid? actingUserId = null)
     {
         var hearing = await _unitOfWork.Hearings.GetByIdWithCaseAsync(id);
         if (hearing is null)
             return ApiResponse<HearingDto>.FailResponse("Hearing not found.");
 
         var newStatus = MappingExtensions.ParseEnum<HearingStatus>(status);
+
+        // Closing (completing) a hearing is reserved for the user who set it, so the same
+        // person who opened the hearing is the one who closes it out with remarks. Legacy
+        // hearings without a recorded creator (CreatedById == null) are left unrestricted.
+        if (newStatus == HearingStatus.Completed
+            && hearing.CreatedById.HasValue
+            && actingUserId.HasValue
+            && hearing.CreatedById.Value != actingUserId.Value)
+        {
+            return ApiResponse<HearingDto>.FailResponse("Only the person who set this hearing can close it.");
+        }
+
         hearing.Status = newStatus;
         hearing.UpdatedAt = DateTime.UtcNow;
 

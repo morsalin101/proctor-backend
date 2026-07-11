@@ -77,7 +77,7 @@ public class CaseRepository : Repository<Case>, ICaseRepository
     public async Task<string> GenerateCaseNumberAsync()
     {
         var year = DateTime.UtcNow.Year;
-        var prefix = $"CASE-{year}-";
+        var prefix = $"PODIU-{year}-";
         var lastCase = await _dbSet
             .Where(c => c.CaseNumber.StartsWith(prefix))
             .OrderByDescending(c => c.CaseNumber)

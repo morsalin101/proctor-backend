@@ -36,6 +36,15 @@ public class NotificationsController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(notifications));
     }
 
+    [HttpGet("case/{caseId:guid}")]
+    public async Task<IActionResult> GetByCase(Guid caseId)
+    {
+        var userId = GetCurrentUserId();
+        var role = GetCurrentUserRole();
+        var notifications = await _notificationService.GetByCaseForUserAsync(caseId, userId, role);
+        return Ok(ApiResponse<object>.SuccessResponse(notifications));
+    }
+
     [HttpGet("unread-count")]
     public async Task<IActionResult> GetUnreadCount()
     {

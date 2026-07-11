@@ -80,6 +80,12 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(c.ToDto());
     }
 
+    public async Task<ApiResponse<string>> GetNextCaseNumberAsync()
+    {
+        var next = await _unitOfWork.Cases.GenerateCaseNumberAsync();
+        return ApiResponse<string>.SuccessResponse(next);
+    }
+
     public async Task<ApiResponse<CaseDto>> CreateCaseAsync(CreateCaseRequest request, string createdBy, Guid? submittedByUserId = null)
     {
         var caseNumber = await _unitOfWork.Cases.GenerateCaseNumberAsync();

@@ -102,7 +102,7 @@ public class WorkflowService : IWorkflowService
 
     public async Task<CaseStatus?> GetForwardStatusAsync(string fromRole, string toRole, CaseStatus currentStatus)
     {
-        // Check DB-configured forwarding rules first
+        // 1. Check DB-configured forwarding rules first.
         var rules = await _forwardingRuleRepository.FindAsync(
             r => r.FromRole == fromRole && r.ToRole == toRole && r.IsActive);
         var rule = rules.FirstOrDefault();
@@ -116,12 +116,12 @@ public class WorkflowService : IWorkflowService
             catch { /* fall through to hardcoded defaults */ }
         }
 
-        // If rule exists but has no explicit status, use "assigned" as default for forwarding
+        // 2. Rule exists but no explicit status — default to Assigned.
         if (rule is not null)
             return CaseStatus.Assigned;
 
-        // Fallback: hardcoded defaults (kept for backward compat until all rules are migrated)
-        return (fromRole, toRole) switch
+        // 3. No DB rule — hardcoded defaults (kept for backward compat).
+        var hardcoded = (fromRole, toRole) switch
         {
             ("coordinator" or "female-coordinator", "proctor") => CaseStatus.Assigned,
             ("coordinator" or "female-coordinator", "sexual-harassment-committee") => CaseStatus.Assigned,
@@ -135,7 +135,24 @@ public class WorkflowService : IWorkflowService
             ("sexual-harassment-committee", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
             ("sexual-harassment-committee", "registrar") => CaseStatus.ForwardedToRegistrar,
             ("disciplinary-committee", "proctor") => CaseStatus.Assigned,
-            _ => null
+            _ => (CaseStatus?)null
         };
+        if (hardcoded.HasValue) return hardcoded;
+
+        // 4. Permissive fallback: any non-student source -> any non-student target
+        //    is allowed with Assigned status. The forwardable-users dropdown lists
+        //    every staff member, so refusing arbitrary forwards (e.g. coordinator
+        //    -> assistant-proctor) leaves the dropdown showing users who can't
+        //    actually receive a forward. Match the dropdown's contract here.
+        //    Students are never a valid forward target (the controller's [Authorize]
+        //    already excludes them as callers, but we double-check here).
+        if (!string.IsNullOrWhiteSpace(toRole)
+            && toRole != "student"
+            && !string.IsNullOrWhiteSpace(fromRole))
+        {
+            return CaseStatus.Assigned;
+        }
+
+        return null;
     }
 }
