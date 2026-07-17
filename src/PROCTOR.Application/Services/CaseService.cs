@@ -616,6 +616,12 @@ public class CaseService : ICaseService
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
 
+        // An open hearing must be closed out before the case moves on: the next role acts
+        // on the hearing's outcome (its remarks), so forwarding first would hand them an
+        // undecided case. The client also disables the Forward button in this state.
+        if (c.Hearings.Any(h => h.Status == HearingStatus.Scheduled))
+            return ApiResponse<CaseDto>.FailResponse("This case has a hearing that is still open. Close the hearing before forwarding the case.");
+
         var newStatus = await _workflowService.GetForwardStatusAsync(userRole, request.TargetRole, c.Status);
         if (newStatus is null)
             return ApiResponse<CaseDto>.FailResponse($"Cannot forward case from role '{userRole}' to '{request.TargetRole}'.");
