@@ -176,8 +176,15 @@ public class CasesController : ControllerBase
     public async Task<IActionResult> UpdateReport(Guid caseId, Guid reportId, [FromBody] CreateReportRequest request)
     {
         var createdByName = GetCurrentUserName();
-        var response = await _caseService.UpdateReportAsync(caseId, reportId, request, createdByName);
-        if (!response.Success) return BadRequest(response);
+        var updatedById = Guid.TryParse(GetCurrentUserId(), out var editorId) ? editorId : Guid.Empty;
+        var response = await _caseService.UpdateReportAsync(caseId, reportId, request, createdByName, updatedById, GetCurrentUserRole());
+        if (!response.Success)
+        {
+            // Editing someone else's report is an authorization failure, not a bad request.
+            if (response.Message?.StartsWith("Only ") == true)
+                return StatusCode(403, response);
+            return BadRequest(response);
+        }
         return Ok(response);
     }
 

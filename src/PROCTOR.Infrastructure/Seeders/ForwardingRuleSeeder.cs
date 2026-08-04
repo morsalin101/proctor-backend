@@ -96,18 +96,26 @@ public static class ForwardingRuleSeeder
             await context.ForwardingRules.AddRangeAsync(assignRules);
         }
 
-        var hasDraftReport = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__draft_report__");
-        if (!hasDraftReport)
+        // Checked per role rather than "does any __draft_report__ row exist", so roles added
+        // later (the coordinators) also reach databases that were seeded before them.
+        var draftReportRoles = new[]
         {
-            var draftReportRules = new List<ForwardingRule>
+            "proctor", "deputy-proctor", "assistant-proctor", "disciplinary-committee",
+            "coordinator", "female-coordinator", "super-admin"
+        };
+        foreach (var fromRole in draftReportRoles)
+        {
+            var exists = await context.ForwardingRules
+                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__draft_report__");
+            if (exists) continue;
+
+            await context.ForwardingRules.AddAsync(new ForwardingRule
             {
-                new() { Id = Guid.NewGuid(), FromRole = "proctor", ToRole = "__draft_report__", ResultStatus = "draft-report" },
-                new() { Id = Guid.NewGuid(), FromRole = "deputy-proctor", ToRole = "__draft_report__", ResultStatus = "draft-report" },
-                new() { Id = Guid.NewGuid(), FromRole = "assistant-proctor", ToRole = "__draft_report__", ResultStatus = "draft-report" },
-                new() { Id = Guid.NewGuid(), FromRole = "disciplinary-committee", ToRole = "__draft_report__", ResultStatus = "draft-report" },
-                new() { Id = Guid.NewGuid(), FromRole = "super-admin", ToRole = "__draft_report__", ResultStatus = "draft-report" },
-            };
-            await context.ForwardingRules.AddRangeAsync(draftReportRules);
+                Id = Guid.NewGuid(),
+                FromRole = fromRole,
+                ToRole = "__draft_report__",
+                ResultStatus = "draft-report"
+            });
         }
 
         await context.SaveChangesAsync();

@@ -11,6 +11,13 @@ public static class SystemSettingSeeder
         ["case_viewing_type1"] = ("student,coordinator,proctor,assistant-proctor,deputy-proctor,registrar,disciplinary-committee,vc,super-admin", "case_viewing", "Roles that can see Type-1 cases"),
         ["case_viewing_type2"] = ("student,coordinator,proctor,assistant-proctor,deputy-proctor,registrar,disciplinary-committee,vc,super-admin", "case_viewing", "Roles that can see Type-2 cases"),
         ["case_viewing_confidential"] = ("proctor,female-coordinator,sexual-harassment-committee,vc,super-admin", "case_viewing", "Roles that can see Confidential cases"),
+
+        // AI report generation. The key is deliberately seeded EMPTY — it is a secret and is
+        // pasted through Settings → AI Integration (or supplied via the GEMINI_API_KEY env var),
+        // never committed to source control.
+        ["ai_provider"] = ("gemini", "ai", "AI provider used for report generation"),
+        ["ai_api_key"] = ("", "ai", "API key for the AI provider (write-only; never returned to clients)"),
+        ["ai_model"] = ("gemini-2.5-flash-lite", "ai", "Model used for AI report generation"),
     };
 
     public static async Task SeedAsync(ProctorDbContext context)

@@ -138,7 +138,8 @@ public static class MenuPermissionSeeder
         }
     }
 
-    // Inserts missing my-cases / notifications rows for existing roles on already-seeded databases.
+    // Inserts missing rows for existing roles on already-seeded databases (SeedAsync bails out
+    // as soon as any permission row exists, so new menus never reach an existing install).
     // Idempotent: skips any (role, menuKey) pair that already exists. Called from Program.cs after SeedAsync.
     public static async Task BackfillMissingPermissionsAsync(ProctorDbContext context)
     {
@@ -173,6 +174,29 @@ public static class MenuPermissionSeeder
                     UpdatedAt = DateTime.UtcNow
                 });
             }
+        }
+
+        // Both coordinators write investigation reports, so the Reports menu is theirs by
+        // default with full CRUD — same as the Proctor they assist.
+        foreach (var role in new[] { UserRole.Coordinator, UserRole.FemaleCoordinator })
+        {
+            var roleId = RoleSeeder.GetDeterministicGuid(role);
+            var exists = await context.MenuPermissions
+                .AnyAsync(mp => mp.RoleId == roleId && mp.MenuKey == "reports");
+            if (exists) continue;
+
+            newRows.Add(new MenuPermission
+            {
+                Id = Guid.NewGuid(),
+                RoleId = roleId,
+                MenuKey = "reports",
+                CanCreate = true,
+                CanRead = true,
+                CanUpdate = true,
+                CanDelete = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
         }
 
         if (newRows.Count > 0)

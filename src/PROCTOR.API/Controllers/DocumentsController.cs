@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PROCTOR.API.Middleware;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Documents;
 using PROCTOR.Domain.Entities;
@@ -69,10 +70,11 @@ public class DocumentsController : ControllerBase
         {
             Id = Guid.NewGuid(),
             CaseId = caseId,
-            Name = name ?? file.FileName,
+            // Multipart form fields bypass the JSON pipeline, so they are scrubbed here instead.
+            Name = SanitizedStringConverter.Sanitize(name ?? file.FileName) ?? string.Empty,
             Type = documentType,
             Url = relativeUrl,
-            UploadedBy = uploadedBy,
+            UploadedBy = SanitizedStringConverter.Sanitize(uploadedBy) ?? string.Empty,
             UploadedByRole = GetCurrentUserRole(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

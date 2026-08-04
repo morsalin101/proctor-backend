@@ -720,12 +720,18 @@ public class CaseService : ICaseService
         return ApiResponse<List<ReportDto>>.SuccessResponse(reports);
     }
 
-    public async Task<ApiResponse<ReportDto>> UpdateReportAsync(Guid caseId, Guid reportId, CreateReportRequest request, string updatedByName)
+    public async Task<ApiResponse<ReportDto>> UpdateReportAsync(Guid caseId, Guid reportId, CreateReportRequest request, string updatedByName, Guid updatedById, string userRole)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
         if (c is null) return ApiResponse<ReportDto>.FailResponse("Case not found.");
         var report = c.Reports.FirstOrDefault(r => r.Id == reportId);
         if (report is null) return ApiResponse<ReportDto>.FailResponse("Report not found.");
+
+        // A report is owned by its author: other roles may read it but never edit it.
+        // Legacy rows written before CreatedById was recorded (Guid.Empty) stay editable so
+        // existing drafts don't become locked for everyone.
+        if (report.CreatedById != Guid.Empty && report.CreatedById != updatedById && userRole != "super-admin")
+            return ApiResponse<ReportDto>.FailResponse($"Only {report.CreatedByName} can edit this report.");
 
         report.Content = request.Content;
         report.IsDraft = request.IsDraft;

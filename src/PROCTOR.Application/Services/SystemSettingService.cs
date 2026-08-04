@@ -54,11 +54,15 @@ public class SystemSettingService : ISystemSettingService
         return ApiResponse<SystemSettingDto>.SuccessResponse(ToDto(setting), "Setting updated successfully.");
     }
 
+    // Settings that hold credentials must never leave through the generic settings endpoints —
+    // they are read/written only by the dedicated service that needs them (see AiController).
+    private static readonly HashSet<string> SecretKeys = new() { "ai_api_key" };
+
     private static SystemSettingDto ToDto(SystemSetting s) => new()
     {
         Id = s.Id.ToString(),
         Key = s.Key,
-        Value = s.Value,
+        Value = SecretKeys.Contains(s.Key) ? string.Empty : s.Value,
         Category = s.Category,
         Description = s.Description
     };

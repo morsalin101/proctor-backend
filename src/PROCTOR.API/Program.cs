@@ -19,6 +19,9 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        // Text pasted from Word/PDF can carry NUL bytes, which PostgreSQL rejects outright
+        // (22021). Scrub them off every inbound string instead of per-field.
+        options.JsonSerializerOptions.Converters.Add(new SanitizedStringConverter());
     });
 
 builder.Services.AddEndpointsApiExplorer();

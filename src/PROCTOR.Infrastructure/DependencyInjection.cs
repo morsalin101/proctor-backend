@@ -23,6 +23,11 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IEmailService, DemoEmailService>();
 
+        // Report drafting via Google Gemini. Generation can take a while on long cases, so the
+        // client gets a generous timeout rather than the 100s default.
+        services.AddHttpClient("gemini", client => client.Timeout = TimeSpan.FromMinutes(3));
+        services.AddScoped<IAiService, GeminiAiService>();
+
         return services;
     }
 }

@@ -17,11 +17,14 @@ public class WorkflowService : IWorkflowService
 
     private static readonly Dictionary<(CaseStatus From, CaseStatus To), HashSet<string>> Transitions = new()
     {
-        // Coordinator / Female Coordinator verification
-        { (CaseStatus.Submitted, CaseStatus.Verified), new() { "coordinator", "female-coordinator" } },
-        { (CaseStatus.Submitted, CaseStatus.Rejected), new() { "coordinator", "female-coordinator" } },
-        { (CaseStatus.Submitted, CaseStatus.OnHold), new() { "coordinator", "female-coordinator" } },
-        { (CaseStatus.Submitted, CaseStatus.ResubmissionRequested), new() { "coordinator", "female-coordinator" } },
+        // Coordinator / Female Coordinator verification.
+        // The Proctor is included in every coordinator transition: a coordinator only *assists*
+        // the Proctor, so the Proctor holds a superset of the coordinator's powers and can
+        // verify / reject / hold / request resubmission on any case without it being forwarded.
+        { (CaseStatus.Submitted, CaseStatus.Verified), new() { "coordinator", "female-coordinator", "proctor" } },
+        { (CaseStatus.Submitted, CaseStatus.Rejected), new() { "coordinator", "female-coordinator", "proctor" } },
+        { (CaseStatus.Submitted, CaseStatus.OnHold), new() { "coordinator", "female-coordinator", "proctor" } },
+        { (CaseStatus.Submitted, CaseStatus.ResubmissionRequested), new() { "coordinator", "female-coordinator", "proctor" } },
 
         // Type-1 quick actions (Coordinator/Proctor/Deputy/Assistant can close, suggest as Type-2, or escalate to police)
         { (CaseStatus.Submitted, CaseStatus.SuggestedType2), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
@@ -30,8 +33,8 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.Verified, CaseStatus.Closed), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.SuggestedType2, CaseStatus.Closed), new() { "coordinator", "female-coordinator", "proctor", "deputy-proctor", "assistant-proctor" } },
         { (CaseStatus.ResubmissionRequested, CaseStatus.Submitted), new() { "student" } },
-        { (CaseStatus.ResubmissionRequested, CaseStatus.Verified), new() { "coordinator", "female-coordinator" } },
-        { (CaseStatus.ResubmissionRequested, CaseStatus.Rejected), new() { "coordinator", "female-coordinator" } },
+        { (CaseStatus.ResubmissionRequested, CaseStatus.Verified), new() { "coordinator", "female-coordinator", "proctor" } },
+        { (CaseStatus.ResubmissionRequested, CaseStatus.Rejected), new() { "coordinator", "female-coordinator", "proctor" } },
 
         // Coordinator forwards verified case (sets to Assigned)
         { (CaseStatus.Verified, CaseStatus.Assigned), new() { "coordinator", "female-coordinator", "proctor", "sexual-harassment-committee" } },
@@ -41,13 +44,14 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.Assigned, CaseStatus.PoliceCase), new() { "proctor", "sexual-harassment-committee" } },
         { (CaseStatus.Assigned, CaseStatus.ForwardedToRegistrar), new() { "proctor", "sexual-harassment-committee" } },
 
-        // Assistant Proctor hearing workflow
-        { (CaseStatus.Assigned, CaseStatus.HearingScheduled), new() { "assistant-proctor" } },
-        { (CaseStatus.HearingScheduled, CaseStatus.HearingCompleted), new() { "assistant-proctor" } },
+        // Hearing workflow — the Proctor can run it directly, without waiting for a forward.
+        { (CaseStatus.Assigned, CaseStatus.HearingScheduled), new() { "assistant-proctor", "proctor" } },
+        { (CaseStatus.Verified, CaseStatus.HearingScheduled), new() { "assistant-proctor", "proctor" } },
+        { (CaseStatus.HearingScheduled, CaseStatus.HearingCompleted), new() { "assistant-proctor", "proctor" } },
 
         // Deputy Proctor actions
-        { (CaseStatus.HearingCompleted, CaseStatus.Assigned), new() { "deputy-proctor" } },
-        { (CaseStatus.HearingCompleted, CaseStatus.Resolved), new() { "deputy-proctor" } },
+        { (CaseStatus.HearingCompleted, CaseStatus.Assigned), new() { "deputy-proctor", "proctor" } },
+        { (CaseStatus.HearingCompleted, CaseStatus.Resolved), new() { "deputy-proctor", "proctor" } },
 
         // Registrar actions
         { (CaseStatus.ForwardedToRegistrar, CaseStatus.ForwardedToCommittee), new() { "registrar" } },
@@ -67,8 +71,8 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.PoliceCase, CaseStatus.Closed), new() { "proctor", "sexual-harassment-committee", "super-admin" } },
 
         // OnHold can be resumed
-        { (CaseStatus.OnHold, CaseStatus.Submitted), new() { "coordinator", "female-coordinator" } },
-        { (CaseStatus.OnHold, CaseStatus.Verified), new() { "coordinator", "female-coordinator" } },
+        { (CaseStatus.OnHold, CaseStatus.Submitted), new() { "coordinator", "female-coordinator", "proctor" } },
+        { (CaseStatus.OnHold, CaseStatus.Verified), new() { "coordinator", "female-coordinator", "proctor" } },
     };
 
     public async Task<bool> ValidateTransitionAsync(CaseStatus from, CaseStatus to, string userRole)

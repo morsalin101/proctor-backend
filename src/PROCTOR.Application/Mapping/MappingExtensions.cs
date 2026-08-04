@@ -270,6 +270,7 @@ public static class MappingExtensions
         CaseId = r.CaseId.ToString(),
         Content = r.Content,
         CreatedByName = r.CreatedByName,
+        CreatedById = r.CreatedById == Guid.Empty ? string.Empty : r.CreatedById.ToString(),
         IsDraft = r.IsDraft,
         IsFinal = r.IsFinal,
         CreatedDate = r.CreatedAt.ToString("o"),
