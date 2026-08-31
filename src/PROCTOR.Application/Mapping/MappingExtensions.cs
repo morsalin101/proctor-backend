@@ -77,7 +77,8 @@ public static class MappingExtensions
         Role = user.Role.ToKebabCase(),
         Gender = user.Gender.ToKebabCase(),
         Avatar = user.Avatar,
-        Rank = user.RankName
+        Rank = user.RankName,
+        ContactNumber = user.ContactNumber
     };
 
     public static CaseDto ToDto(this Case c) => new()
@@ -107,6 +108,9 @@ public static class MappingExtensions
         AcknowledgedById = c.AcknowledgedById?.ToString(),
         AcknowledgedByName = c.AcknowledgedByName,
         AcknowledgmentComment = c.AcknowledgmentComment,
+        ClosingMessage = c.ClosingMessage,
+        ClosedAt = c.ClosedAt?.ToString("o"),
+        ClosedByName = c.ClosedByName,
         IncidentLatitude = c.IncidentLatitude,
         IncidentLongitude = c.IncidentLongitude,
         IncidentLocationDescription = c.IncidentLocationDescription,
@@ -156,6 +160,8 @@ public static class MappingExtensions
         UserId = a.UserId.ToString(),
         UserName = a.User?.Name ?? string.Empty,
         UserRole = a.User?.Role.ToKebabCase() ?? string.Empty,
+        UserRank = a.User?.RankName,
+        UserContactNumber = a.User?.ContactNumber,
         AssignedAt = a.AssignedAt.ToString("o"),
         IsPrimary = a.IsPrimary,
         IsActive = a.IsActive
@@ -235,6 +241,24 @@ public static class MappingExtensions
         Remarks = h.Remarks,
         CreatedById = h.CreatedById?.ToString(),
         CreatedByName = h.CreatedByName,
+        ConductedById = h.ConductedById?.ToString(),
+        ConductedByName = h.ConductedByName,
+        ConductedAt = h.ConductedAt?.ToString("o"),
+        Reschedules = h.Reschedules
+            .OrderBy(r => r.RescheduledAt)
+            .Select(r => new HearingRescheduleDto
+            {
+                Id = r.Id,
+                FromDate = r.FromDate,
+                FromTime = r.FromTime,
+                FromLocation = r.FromLocation,
+                ToDate = r.ToDate,
+                ToTime = r.ToTime,
+                ToLocation = r.ToLocation,
+                Reason = r.Reason,
+                RescheduledBy = r.RescheduledBy,
+                RescheduledAt = r.RescheduledAt.ToString("o")
+            }).ToList(),
         EmailNotifications = h.EmailNotifications
             .OrderByDescending(n => n.SentAt)
             .Select(n => new HearingEmailNotificationDto

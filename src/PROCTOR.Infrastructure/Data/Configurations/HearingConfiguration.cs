@@ -30,6 +30,18 @@ public class HearingConfiguration : IEntityTypeConfiguration<Hearing>
                     v => JsonSerializer.Deserialize<List<HearingEmailNotification>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new()))
             .HasColumnType("jsonb");
 
+        builder.Property(h => h.Reschedules)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => string.IsNullOrWhiteSpace(v)
+                    ? new List<HearingReschedule>()
+                    : JsonSerializer.Deserialize<List<HearingReschedule>>(v, (JsonSerializerOptions?)null) ?? new(),
+                new ValueComparer<List<HearingReschedule>>(
+                    (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+                    v => v == null ? 0 : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+                    v => JsonSerializer.Deserialize<List<HearingReschedule>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new()))
+            .HasColumnType("jsonb");
+
         builder.HasOne(h => h.Case)
             .WithMany(c => c.Hearings)
             .HasForeignKey(h => h.CaseId);

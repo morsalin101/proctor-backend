@@ -14,7 +14,7 @@ public static class RoleSeeder
         {
             Id = GetDeterministicGuid(role),
             RoleName = role,
-            DisplayName = InsertSpaces(role.ToString()),
+            DisplayName = GetDisplayName(role),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
@@ -22,6 +22,57 @@ public static class RoleSeeder
         await context.Roles.AddRangeAsync(roles);
         await context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Inserts Role rows for enum values added after the first seed (SeedAsync
+    /// short-circuits once any role row exists).
+    /// </summary>
+    public static async Task BackfillMissingRolesAsync(ProctorDbContext context)
+    {
+        var existing = context.Roles.Select(r => r.RoleName).ToHashSet();
+        var missing = Enum.GetValues<UserRole>()
+            .Where(role => !existing.Contains(role))
+            .Select(role => new Role
+            {
+                Id = GetDeterministicGuid(role),
+                RoleName = role,
+                DisplayName = GetDisplayName(role),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (missing.Count == 0) return;
+        await context.Roles.AddRangeAsync(missing);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotently refreshes DisplayName on existing databases (SeedAsync
+    /// short-circuits once any role row exists).
+    /// </summary>
+    public static async Task BackfillDisplayNamesAsync(ProctorDbContext context)
+    {
+        var changed = false;
+        foreach (var role in context.Roles.ToList())
+        {
+            var expected = GetDisplayName(role.RoleName);
+            if (role.DisplayName == expected) continue;
+            role.DisplayName = expected;
+            role.UpdatedAt = DateTime.UtcNow;
+            changed = true;
+        }
+        if (changed) await context.SaveChangesAsync();
+    }
+
+    private static string GetDisplayName(UserRole role) => role switch
+    {
+        // "Coordinator" is a legacy enum key: the role IS the Proctor Office's
+        // Administrative Officer and carries the same power as the Proctor.
+        UserRole.Coordinator => "Administrative Officer",
+        UserRole.FemaleCoordinator => "Female Administrative Officer",
+        _ => InsertSpaces(role.ToString())
+    };
 
     public static Guid GetDeterministicGuid(UserRole role)
     {

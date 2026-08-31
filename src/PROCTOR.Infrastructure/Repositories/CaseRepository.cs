@@ -103,13 +103,15 @@ public class CaseRepository : Repository<Case>, ICaseRepository
     {
         var query = _dbSet.AsQueryable();
 
-        // Gender-separated coordinator tracks: the male Coordinator never sees female-track
-        // cases (female complainant or confidential), and the Female Coordinator only sees
-        // those. Every other role is unaffected.
-        if (userRole == "coordinator")
-            query = query.Where(c => !(c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female));
-        else if (userRole == "female-coordinator")
-            query = query.Where(c => c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
+        // The Administrative Officer ("coordinator") is the Proctor's deputy and sees every
+        // case, so no filter applies to them. The Female Coordinator stays scoped to her own
+        // track — female complainants and confidential cases — plus every instant (Type-1)
+        // incident, which the whole proctorial team responds to regardless of gender.
+        if (userRole == "female-coordinator")
+            query = query.Where(c =>
+                c.Type == CaseType.Confidential
+                || c.Type == CaseType.Type1
+                || c.SubmitterGender == Gender.Female);
 
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);

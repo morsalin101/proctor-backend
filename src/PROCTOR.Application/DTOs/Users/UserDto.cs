@@ -9,4 +9,5 @@ public class UserDto
     public string? Gender { get; set; }
     public string? Avatar { get; set; }
     public string? Rank { get; set; }
+    public string? ContactNumber { get; set; }
 }

@@ -75,6 +75,18 @@ public class WorkflowService : IWorkflowService
         { (CaseStatus.OnHold, CaseStatus.Verified), new() { "coordinator", "female-coordinator", "proctor" } },
     };
 
+    static WorkflowService()
+    {
+        // The Administrative Officer (legacy "coordinator" key) is the Proctor's assistant and
+        // in practice runs the office, so they hold exactly the Proctor's transitions. Applied
+        // here rather than by editing every entry above, so the two can never drift apart.
+        foreach (var roles in Transitions.Values)
+        {
+            if (roles.Contains("proctor"))
+                roles.Add("coordinator");
+        }
+    }
+
     public async Task<bool> ValidateTransitionAsync(CaseStatus from, CaseStatus to, string userRole)
     {
         if (userRole == "super-admin") return true;
@@ -129,11 +141,11 @@ public class WorkflowService : IWorkflowService
         {
             ("coordinator" or "female-coordinator", "proctor") => CaseStatus.Assigned,
             ("coordinator" or "female-coordinator", "sexual-harassment-committee") => CaseStatus.Assigned,
-            ("proctor", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
+            ("proctor" or "coordinator", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
             ("assistant-proctor", "deputy-proctor") => currentStatus,
             ("deputy-proctor", "assistant-proctor") => CaseStatus.Assigned,
             ("deputy-proctor", "proctor") => CaseStatus.Assigned,
-            ("proctor", "registrar") => CaseStatus.ForwardedToRegistrar,
+            ("proctor" or "coordinator", "registrar") => CaseStatus.ForwardedToRegistrar,
             ("registrar", "proctor") => CaseStatus.Assigned,
             ("registrar", "disciplinary-committee") => CaseStatus.ForwardedToCommittee,
             ("sexual-harassment-committee", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,

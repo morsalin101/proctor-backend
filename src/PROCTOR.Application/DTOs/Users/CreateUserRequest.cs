@@ -8,4 +8,5 @@ public class CreateUserRequest
     public string Role { get; set; } = string.Empty;
     public string? Gender { get; set; }
     public string? Rank { get; set; }
+    public string? ContactNumber { get; set; }
 }

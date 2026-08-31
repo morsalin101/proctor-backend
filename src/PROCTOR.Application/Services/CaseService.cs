@@ -60,11 +60,16 @@ public class CaseService : ICaseService
     // complainant is female or the case is confidential.
     public static bool IsFemaleTrack(Case c) => c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female;
 
-    // The two coordinator roles are gender-separated; every other role is unaffected.
+    // The Administrative Officer ("coordinator") is the Proctor's deputy and carries the same
+    // power, so they see every case — the Proctor is rarely free and the office runs through
+    // them. Only the Female Coordinator stays scoped, to her own female/confidential track.
+    // Note this is a visibility rule; auto-routing still sends a female complainant's case to
+    // the Female Coordinator (CreateCaseAsync).
     private static bool CoordinatorMayView(string? role, Case c)
     {
-        if (role == "coordinator") return !IsFemaleTrack(c);        // male coordinator: never female-track
-        if (role == "female-coordinator") return IsFemaleTrack(c);  // female coordinator: only female-track
+        // The Female Coordinator keeps her own track — plus every instant (Type-1) incident,
+        // which is an emergency the whole proctorial team responds to regardless of gender.
+        if (role == "female-coordinator") return IsFemaleTrack(c) || c.Type == CaseType.Type1;
         return true;
     }
 
@@ -248,17 +253,31 @@ public class CaseService : ICaseService
             var settingResp = await _systemSettingService.GetSettingByKeyAsync("type1_forwarding_roles");
             var rolesCsv = settingResp?.Data?.Value;
             if (string.IsNullOrWhiteSpace(rolesCsv))
-                rolesCsv = "proctor,deputy-proctor";
+                rolesCsv = "proctor,coordinator,deputy-proctor,assistant-proctor";
 
             var targetRoles = rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries)
                                       .Select(r => r.Trim())
                                       .Where(r => !string.IsNullOrEmpty(r))
                                       .ToList();
 
-            foreach (var roleKey in targetRoles)
+            // An instant incident is an emergency: everyone concerned is told at once, not
+            // just the first role in the queue. "proctor" already got the heads-up above,
+            // so it is skipped here to avoid a duplicate notification.
+            foreach (var roleKey in targetRoles.Where(r => r != "proctor").Distinct())
             {
-                await _notificationService.CreateAsync(null, roleKey, "New Type-1 Incident",
-                    $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
+                await _notificationService.CreateAsync(null, roleKey, "New Instant Incident",
+                    $"Case {caseNumber} has been submitted by {request.StudentName}. Immediate attention required.",
+                    newCase.Id);
+            }
+
+            // Submission receipt. The Control Room number is deliberately NOT repeated here —
+            // it is sent once, with the acknowledgment.
+            if (submittedByUserId.HasValue)
+            {
+                await _notificationService.CreateAsync(submittedByUserId.Value, null,
+                    "Incident Received",
+                    $"Your incident {caseNumber} has been received and the proctorial team has been alerted.",
+                    newCase.Id);
             }
 
             if (targetRoles.Count > 0)
@@ -387,6 +406,16 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case updated successfully.");
     }
 
+    /// <summary>
+    /// The 24/7 Control Room number from Settings. Returns empty when the setting is
+    /// missing or blank, in which case callers simply omit the contact line.
+    /// </summary>
+    private async Task<string> GetControlRoomNumberAsync()
+    {
+        var setting = await _systemSettingService.GetSettingByKeyAsync("control_room_number");
+        return setting.Success ? (setting.Data?.Value ?? string.Empty).Trim() : string.Empty;
+    }
+
     public async Task<ApiResponse<CaseDto>> AcknowledgeCaseAsync(Guid id, AcknowledgeCaseRequest request, Guid userId, string userName)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
@@ -418,15 +447,27 @@ public class CaseService : ICaseService
         if (c.SubmittedByUserId.HasValue)
         {
             var msg = string.IsNullOrWhiteSpace(request.Comment)
-                ? $"Your case {c.CaseNumber} has been acknowledged by {userName} (Proctor)."
-                : $"Message from {userName} (Proctor) on {c.CaseNumber}: \"{request.Comment}\"";
+                ? $"Your case {c.CaseNumber} has been acknowledged by {userName} (Proctor Office)."
+                : $"Message from {userName} (Proctor Office) on {c.CaseNumber}: \"{request.Comment}\"";
+
+            // The acknowledgment is the one message that carries the 24/7 Control Room number.
+            // The dialog pre-fills it into the note, so only append it when the officer's text
+            // doesn't already mention it — otherwise the student sees it twice.
+            var controlRoom = await GetControlRoomNumberAsync();
+            if (!string.IsNullOrWhiteSpace(controlRoom) && !msg.Contains(controlRoom, StringComparison.Ordinal))
+                msg += $"\n\nControl Room (24/7): {controlRoom}";
+
             await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
-                "Case Acknowledged — Message from Proctor", msg, c.Id);
+                "Case Acknowledged — Message from Administrative", msg, c.Id);
         }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case acknowledged.");
     }
+
+    /// <summary>Roles that can be named as case handlers. Mirrors ASSIGNABLE_HANDLER_ROLES on the client.</summary>
+    private static readonly UserRole[] AssignableHandlerRoles =
+        [UserRole.AssistantProctor, UserRole.DeputyProctor];
 
     public async Task<ApiResponse<CaseDto>> AssignCaseAsync(Guid id, AssignCaseRequest request, Guid actingUserId, string actingUserName)
     {
@@ -441,14 +482,30 @@ public class CaseService : ICaseService
         if (userGuids.Count == 0)
             return ApiResponse<CaseDto>.FailResponse("At least one user must be assigned.");
 
+        // Only the field officers actually work a case. The Proctor and the Administrative
+        // Officers decide the assignment (enforced by the __assign__ permission on the
+        // endpoint); they cannot assign to themselves, a student, or an external participant.
+        foreach (var uid in userGuids)
+        {
+            var candidate = await _unitOfWork.Users.GetByIdAsync(uid);
+            if (candidate is null)
+                return ApiResponse<CaseDto>.FailResponse("One of the selected users no longer exists.");
+            if (!AssignableHandlerRoles.Contains(candidate.Role))
+                return ApiResponse<CaseDto>.FailResponse(
+                    $"{candidate.Name} cannot be assigned as a handler — only Assistant and Deputy Proctors can.");
+        }
+
         Guid? primaryGuid = null;
         if (!string.IsNullOrWhiteSpace(request.PrimaryUserId) && Guid.TryParse(request.PrimaryUserId, out var pg))
             primaryGuid = pg;
 
-        // Deactivate existing assignments not in the new list
+        // Deactivate handlers dropped from the new list. Assignments held by anyone outside
+        // the handler roles are left alone — a Type-2 case auto-routed to an Administrative
+        // Officer must not lose that link just because handlers were named.
         foreach (var existing in c.Assignments.Where(a => a.IsActive).ToList())
         {
-            if (!userGuids.Contains(existing.UserId))
+            var isHandler = existing.User is not null && AssignableHandlerRoles.Contains(existing.User.Role);
+            if (isHandler && !userGuids.Contains(existing.UserId))
                 existing.IsActive = false;
         }
 
@@ -494,7 +551,10 @@ public class CaseService : ICaseService
             c.AssignedToId = firstActive.UserId;
         }
 
-        if (c.Status == CaseStatus.Submitted || c.Status == CaseStatus.Verified)
+        // Type-1 has its own short flow (submit → acknowledge → close/escalate) with no
+        // "assigned" stage, so naming handlers must not move it out of Submitted — doing so
+        // would hide the Suggest-to-Type-2 / Police / Close actions on the incident.
+        if (c.Type != CaseType.Type1 && (c.Status == CaseStatus.Submitted || c.Status == CaseStatus.Verified))
             c.Status = CaseStatus.Assigned;
 
         // `c` was loaded with change-tracking, so mutating it (and adding/removing
@@ -521,6 +581,34 @@ public class CaseService : ICaseService
                 $"You have been assigned to case {c.CaseNumber}.", c.Id);
         }
 
+        // The complainant is told exactly who is handling their case and how to reach them —
+        // name, role and contact number, so they are never left guessing.
+        if (c.SubmittedByUserId.HasValue)
+        {
+            var handlers = new List<User>();
+            foreach (var uid in userGuids)
+            {
+                var u = await _unitOfWork.Users.GetByIdAsync(uid);
+                if (u is not null) handlers.Add(u);
+            }
+
+            if (handlers.Count > 0)
+            {
+                var lines = handlers.Select(u =>
+                {
+                    var who = $"• {u.Name} ({u.RankName ?? u.Role.ToKebabCase()})";
+                    return string.IsNullOrWhiteSpace(u.ContactNumber) ? who : $"{who} — {u.ContactNumber}";
+                });
+
+                // Only the handlers' own contact details here — the Control Room number is sent
+                // once, with the acknowledgment.
+                var msg = $"Case {c.CaseNumber} is being handled by:\n{string.Join("\n", lines)}";
+
+                await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
+                    "Your Case Has Been Assigned", msg, c.Id);
+            }
+        }
+
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Assignments updated.");
     }
@@ -537,6 +625,19 @@ public class CaseService : ICaseService
         if (!await _workflowService.ValidateTransitionAsync(oldStatus, newStatus, userRole))
             return ApiResponse<CaseDto>.FailResponse($"Transition from '{oldStatus.ToKebabCase()}' to '{newStatus.ToKebabCase()}' is not allowed for role '{userRole}'.");
 
+        // A case may only be closed with a stated reason — it is the record of why the
+        // matter ended, and the complainant is notified with it.
+        if (newStatus == CaseStatus.Closed)
+        {
+            var closingMessage = (request.ClosingMessage ?? request.Verdict ?? request.Note ?? string.Empty).Trim();
+            if (closingMessage.Length == 0)
+                return ApiResponse<CaseDto>.FailResponse("A closing message is required before a case can be closed.");
+
+            c.ClosingMessage = closingMessage;
+            c.ClosedAt = DateTime.UtcNow;
+            c.ClosedByName = updatedBy;
+        }
+
         c.Status = newStatus;
 
         if (!string.IsNullOrWhiteSpace(request.Verdict))
@@ -552,7 +653,9 @@ public class CaseService : ICaseService
             Id = Guid.NewGuid(),
             CaseId = c.Id,
             Action = "Status Changed",
-            Description = $"Status changed from {oldStatus.ToKebabCase()} to {newStatus.ToKebabCase()}.",
+            Description = newStatus == CaseStatus.Closed
+                ? $"Case closed. Reason: \"{c.ClosingMessage}\""
+                : $"Status changed from {oldStatus.ToKebabCase()} to {newStatus.ToKebabCase()}.",
             User = updatedBy
         });
 
@@ -602,8 +705,11 @@ public class CaseService : ICaseService
 
         if (newStatus != CaseStatus.ResubmissionRequested && newStatus != CaseStatus.Rejected && newStatus != CaseStatus.Submitted && c.SubmittedByUserId.HasValue)
         {
+            var studentMsg = newStatus == CaseStatus.Closed
+                ? $"Your case {c.CaseNumber} has been closed. Reason: \"{c.ClosingMessage}\""
+                : $"Your case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.";
             await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
-                "Case Update", $"Your case {c.CaseNumber} status changed to {newStatus.ToKebabCase()}.", c.Id);
+                newStatus == CaseStatus.Closed ? "Case Closed" : "Case Update", studentMsg, c.Id);
         }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);

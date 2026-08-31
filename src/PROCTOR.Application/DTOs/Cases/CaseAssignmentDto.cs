@@ -6,6 +6,8 @@ public class CaseAssignmentDto
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string UserRole { get; set; } = string.Empty;
+    public string? UserRank { get; set; }
+    public string? UserContactNumber { get; set; }
     public string AssignedAt { get; set; } = string.Empty;
     public bool IsPrimary { get; set; }
     public bool IsActive { get; set; } = true;

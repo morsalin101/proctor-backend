@@ -22,15 +22,16 @@ public class HearingService : IHearingService
         _emailService = emailService;
     }
 
-    // Female-track cases (female complainant or confidential) are kept on the Female
-    // Coordinator track and away from the (male) Coordinator.
+    // Female-track cases: a female complainant or a confidential case.
     private static bool IsFemaleTrack(Case? c) =>
         c is not null && (c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
 
+    // The Administrative Officer ("coordinator") sees every hearing, matching the Proctor.
+    // Only the Female Coordinator stays scoped to her own track.
     private static bool CoordinatorMayView(string? role, Case? c)
     {
-        if (role == "coordinator") return !IsFemaleTrack(c);
-        if (role == "female-coordinator") return IsFemaleTrack(c);
+        // Mirrors CaseService: her own track, plus every instant (Type-1) incident.
+        if (role == "female-coordinator") return IsFemaleTrack(c) || c?.Type == CaseType.Type1;
         return true;
     }
 
@@ -141,7 +142,7 @@ public class HearingService : IHearingService
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing updated successfully.");
     }
 
-    public async Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status, Guid? actingUserId = null)
+    public async Task<ApiResponse<HearingDto>> UpdateHearingStatusAsync(Guid id, string status, Guid? actingUserId = null, string? actingUserName = null)
     {
         var hearing = await _unitOfWork.Hearings.GetByIdWithCaseAsync(id);
         if (hearing is null)
@@ -165,6 +166,12 @@ public class HearingService : IHearingService
 
         if (newStatus == HearingStatus.Completed)
         {
+            // Record who actually conducted the hearing — the user closing it out is the
+            // one who chaired it, since only the setter may complete a hearing.
+            hearing.ConductedById = actingUserId ?? hearing.CreatedById;
+            hearing.ConductedByName = actingUserName ?? hearing.CreatedByName;
+            hearing.ConductedAt = DateTime.UtcNow;
+
             var existingCase = hearing.Case;
             existingCase.Status = CaseStatus.HearingCompleted;
             existingCase.UpdatedAt = DateTime.UtcNow;
@@ -175,6 +182,79 @@ public class HearingService : IHearingService
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing status updated successfully.");
+    }
+
+    public async Task<ApiResponse<HearingDto>> RescheduleHearingAsync(
+        Guid id, RescheduleHearingRequest request, Guid? actingUserId, string actingUserName)
+    {
+        var hearing = await _unitOfWork.Hearings.GetByIdWithCaseAsync(id);
+        if (hearing is null)
+            return ApiResponse<HearingDto>.FailResponse("Hearing not found.");
+
+        if (hearing.Status != HearingStatus.Scheduled)
+            return ApiResponse<HearingDto>.FailResponse("Only a scheduled hearing can be rescheduled.");
+
+        var date = (request.Date ?? string.Empty).Trim();
+        var time = (request.Time ?? string.Empty).Trim();
+        var reason = (request.Reason ?? string.Empty).Trim();
+        if (date.Length == 0 || time.Length == 0)
+            return ApiResponse<HearingDto>.FailResponse("A new date and time are required.");
+        if (reason.Length == 0)
+            return ApiResponse<HearingDto>.FailResponse("A reason for rescheduling is required.");
+
+        // Only the person who set the hearing may move it, matching who may close it.
+        if (hearing.CreatedById.HasValue && actingUserId.HasValue && hearing.CreatedById.Value != actingUserId.Value)
+            return ApiResponse<HearingDto>.FailResponse("Only the person who set this hearing can reschedule it.");
+
+        var location = string.IsNullOrWhiteSpace(request.Location) ? hearing.Location : request.Location!.Trim();
+        if (date == hearing.Date && time == hearing.Time && location == hearing.Location)
+            return ApiResponse<HearingDto>.FailResponse("The new slot is the same as the current one.");
+
+        hearing.Reschedules = new List<HearingReschedule>(hearing.Reschedules)
+        {
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                FromDate = hearing.Date,
+                FromTime = hearing.Time,
+                FromLocation = hearing.Location,
+                ToDate = date,
+                ToTime = time,
+                ToLocation = location,
+                Reason = reason,
+                RescheduledBy = actingUserName,
+                RescheduledAt = DateTime.UtcNow
+            }
+        };
+
+        var previous = $"{hearing.Date} at {hearing.Time}";
+        hearing.Date = date;
+        hearing.Time = time;
+        hearing.Location = location;
+        hearing.UpdatedAt = DateTime.UtcNow;
+        _unitOfWork.Hearings.Update(hearing);
+
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = hearing.CaseId,
+            Action = "Hearing Rescheduled",
+            Description = $"Hearing moved from {previous} to {date} at {time} ({location}). Reason: \"{reason}\"",
+            User = actingUserName
+        });
+
+        await _unitOfWork.SaveChangesAsync();
+
+        var c = hearing.Case;
+        if (c?.SubmittedByUserId is not null)
+        {
+            await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
+                "Hearing Rescheduled",
+                $"The hearing for case {c.CaseNumber} has moved to {date} at {time} ({location}). Reason: \"{reason}\"",
+                c.Id);
+        }
+
+        return ApiResponse<HearingDto>.SuccessResponse(hearing.ToDto(), "Hearing rescheduled.");
     }
 
     public async Task<ApiResponse<UpcomingHearingsDto>> GetUpcomingHearingsAsync(Guid? userId, string? userRole = null)

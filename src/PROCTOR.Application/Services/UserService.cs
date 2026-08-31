@@ -54,7 +54,8 @@ public class UserService : IUserService
                 ? MappingExtensions.ParseEnum<Gender>(request.Gender)
                 : Gender.Unspecified,
             IsActive = true,
-            RankName = request.Rank
+            RankName = request.Rank,
+            ContactNumber = request.ContactNumber
         };
 
         await _unitOfWork.Users.AddAsync(user);
@@ -89,6 +90,8 @@ public class UserService : IUserService
 
         if (request.Rank is not null)
             user.RankName = request.Rank;
+        if (request.ContactNumber is not null)
+            user.ContactNumber = request.ContactNumber;
 
         user.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.Users.Update(user);

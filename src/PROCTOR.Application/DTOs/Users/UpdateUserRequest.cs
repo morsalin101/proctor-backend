@@ -9,4 +9,5 @@ public class UpdateUserRequest
     public string? Gender { get; set; }
     public bool? IsActive { get; set; }
     public string? Rank { get; set; }
+    public string? ContactNumber { get; set; }
 }

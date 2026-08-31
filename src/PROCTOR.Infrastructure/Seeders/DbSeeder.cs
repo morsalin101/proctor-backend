@@ -8,14 +8,21 @@ public static class DbSeeder
     public static async Task SeedAsync(ProctorDbContext context, ILogger logger)
     {
         await RoleSeeder.SeedAsync(context);
+        await RoleSeeder.BackfillMissingRolesAsync(context);
+        await RoleSeeder.BackfillDisplayNamesAsync(context);
         await UserSeeder.SeedAsync(context);
         await UserSeeder.BackfillGendersAsync(context);
+        await ProctorialBodySeeder.SeedAsync(context);
         await MenuPermissionSeeder.SeedAsync(context);
         // Idempotently add missing my-cases / notifications rows for existing databases
         await MenuPermissionSeeder.BackfillMissingPermissionsAsync(context);
+        await MenuPermissionSeeder.BackfillExternalRoleAsync(context);
+        await MenuPermissionSeeder.BackfillAdministrativeOfficerAsync(context);
         await SystemSettingSeeder.SeedAsync(context);
+        await SystemSettingSeeder.BackfillType1RolesAsync(context);
         await ForwardingRuleSeeder.SeedAsync(context);
         await ForwardingRuleSeeder.SeedSpecialRulesAsync(context);
+        await ForwardingRuleSeeder.RestrictAssignRolesAsync(context);
         await CaseCategorySeeder.SeedAsync(context);
         await StudentSeeder.SeedAsync(context);
         await CaseSubjectSeeder.SeedAsync(context);

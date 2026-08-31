@@ -30,11 +30,10 @@ public static class MenuPermissionSeeder
             ["settings"] = "RU"
         });
 
-        // Coordinator mirrors Proctor's full access (combined power) EXCEPT the dedicated
-        // "confidential" menu — confidential / female-complainant cases stay on the Female
-        // Coordinator's gender-separated track. Case visibility is still gender-filtered in
-        // CaseRepository / CaseService (the male coordinator never sees the female track).
-        AddFullCrudPermissions(permissions, UserRole.Coordinator, "confidential");
+        // The Administrative Officer ("coordinator") is the Proctor's assistant and in practice
+        // runs the office, so the role mirrors the Proctor exactly — every menu, full CRUD,
+        // the confidential queue included.
+        AddFullCrudPermissions(permissions, UserRole.Coordinator);
 
         AddFullCrudPermissions(permissions, UserRole.Proctor);
 
@@ -110,7 +109,96 @@ public static class MenuPermissionSeeder
 
         AddFullCrudPermissions(permissions, UserRole.SuperAdmin);
 
+        AddPermissions(permissions, UserRole.External, ExternalAccess);
+
         await context.MenuPermissions.AddRangeAsync(permissions);
+        await context.SaveChangesAsync();
+    }
+
+    // An external participant called to a hearing sees only their own cases and the
+    // hearings on them — no case list, no reports, no directory.
+    private static readonly Dictionary<string, string> ExternalAccess = new()
+    {
+        ["dashboard"] = "R",
+        ["my-cases"] = "R",
+        ["notifications"] = "R",
+        ["hearings"] = "R",
+        ["settings"] = "RU"
+    };
+
+    /// <summary>
+    /// Brings the Administrative Officer ("coordinator") up to full Proctor-equivalent access
+    /// on databases seeded while the role was still restricted. Idempotent: existing rows are
+    /// upgraded in place, missing ones inserted.
+    /// </summary>
+    public static async Task BackfillAdministrativeOfficerAsync(ProctorDbContext context)
+    {
+        var roleId = RoleSeeder.GetDeterministicGuid(UserRole.Coordinator);
+        var existing = await context.MenuPermissions
+            .Where(mp => mp.RoleId == roleId)
+            .ToDictionaryAsync(mp => mp.MenuKey);
+
+        var changed = false;
+        foreach (var menuKey in AllMenuKeys)
+        {
+            if (existing.TryGetValue(menuKey, out var row))
+            {
+                if (row.CanCreate && row.CanRead && row.CanUpdate && row.CanDelete) continue;
+                row.CanCreate = row.CanRead = row.CanUpdate = row.CanDelete = true;
+                row.UpdatedAt = DateTime.UtcNow;
+                changed = true;
+                continue;
+            }
+
+            context.MenuPermissions.Add(new MenuPermission
+            {
+                Id = Guid.NewGuid(),
+                RoleId = roleId,
+                MenuKey = menuKey,
+                CanCreate = true,
+                CanRead = true,
+                CanUpdate = true,
+                CanDelete = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            changed = true;
+        }
+
+        if (changed) await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Grants the External role its menus on databases seeded before the role existed.
+    /// Idempotent: skips any (role, menuKey) pair already present.
+    /// </summary>
+    public static async Task BackfillExternalRoleAsync(ProctorDbContext context)
+    {
+        var roleId = RoleSeeder.GetDeterministicGuid(UserRole.External);
+        var newRows = new List<MenuPermission>();
+
+        foreach (var (menuKey, access) in ExternalAccess)
+        {
+            var exists = await context.MenuPermissions
+                .AnyAsync(mp => mp.RoleId == roleId && mp.MenuKey == menuKey);
+            if (exists) continue;
+
+            newRows.Add(new MenuPermission
+            {
+                Id = Guid.NewGuid(),
+                RoleId = roleId,
+                MenuKey = menuKey,
+                CanCreate = access.Contains('C'),
+                CanRead = access.Contains('R'),
+                CanUpdate = access.Contains('U'),
+                CanDelete = access.Contains('D'),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+
+        if (newRows.Count == 0) return;
+        await context.MenuPermissions.AddRangeAsync(newRows);
         await context.SaveChangesAsync();
     }
 

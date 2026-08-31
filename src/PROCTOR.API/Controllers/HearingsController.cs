@@ -101,7 +101,20 @@ public class HearingsController : ControllerBase
     public async Task<IActionResult> UpdateHearingStatus(Guid id, [FromBody] UpdateHearingStatusRequest request)
     {
         Guid? actingUserId = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : null;
-        var response = await _hearingService.UpdateHearingStatusAsync(id, request.Status, actingUserId);
+        var response = await _hearingService.UpdateHearingStatusAsync(id, request.Status, actingUserId, GetCurrentUserName());
+        if (!response.Success)
+            return BadRequest(response);
+
+        return Ok(response);
+    }
+
+    // Move a scheduled hearing to a new slot. The original slot and the reason are kept
+    // in the hearing's reschedule history and on the case timeline.
+    [HttpPost("{id:guid}/reschedule")]
+    public async Task<IActionResult> RescheduleHearing(Guid id, [FromBody] RescheduleHearingRequest request)
+    {
+        Guid? actingUserId = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : null;
+        var response = await _hearingService.RescheduleHearingAsync(id, request, actingUserId, GetCurrentUserName());
         if (!response.Success)
             return BadRequest(response);
 

@@ -13,5 +13,8 @@ public class User : BaseEntity
     public bool IsActive { get; set; } = true;
     public string? RankName { get; set; }
 
+    /// <summary>Phone number shown to a complainant when this user is assigned to their case.</summary>
+    public string? ContactNumber { get; set; }
+
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

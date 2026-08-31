@@ -44,6 +44,11 @@ public class Case : BaseEntity
     public string? AcknowledgedByName { get; set; }
     public string? AcknowledgmentComment { get; set; }
 
+    // Case closure. A closing message is mandatory before a case can move to Closed.
+    public string? ClosingMessage { get; set; }
+    public DateTime? ClosedAt { get; set; }
+    public string? ClosedByName { get; set; }
+
     // Type-1 incident location (captured via browser geolocation)
     public double? IncidentLatitude { get; set; }
     public double? IncidentLongitude { get; set; }

@@ -38,6 +38,11 @@ public class CaseDto
     public string? AcknowledgedByName { get; set; }
     public string? AcknowledgmentComment { get; set; }
 
+    // Closure
+    public string? ClosingMessage { get; set; }
+    public string? ClosedAt { get; set; }
+    public string? ClosedByName { get; set; }
+
     // Location (Type-1)
     public double? IncidentLatitude { get; set; }
     public double? IncidentLongitude { get; set; }

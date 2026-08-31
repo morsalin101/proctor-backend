@@ -15,7 +15,25 @@ public class HearingDto
     public string? Remarks { get; set; }
     public string? CreatedById { get; set; }
     public string? CreatedByName { get; set; }
+    public string? ConductedById { get; set; }
+    public string? ConductedByName { get; set; }
+    public string? ConductedAt { get; set; }
+    public List<HearingRescheduleDto> Reschedules { get; set; } = [];
     public List<HearingEmailNotificationDto> EmailNotifications { get; set; } = [];
+}
+
+public class HearingRescheduleDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string FromDate { get; set; } = string.Empty;
+    public string FromTime { get; set; } = string.Empty;
+    public string? FromLocation { get; set; }
+    public string ToDate { get; set; } = string.Empty;
+    public string ToTime { get; set; } = string.Empty;
+    public string? ToLocation { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string RescheduledBy { get; set; } = string.Empty;
+    public string RescheduledAt { get; set; } = string.Empty;
 }
 
 public class HearingEmailNotificationDto
