@@ -23,6 +23,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.Gender)
             .HasConversion<string>();
 
+        builder.Property(s => s.Cgpa)
+            .HasPrecision(3, 2);
+
         builder.Property(s => s.IsActive)
             .HasDefaultValue(true);
     }

@@ -14,6 +14,7 @@ public class Student : BaseEntity
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public Gender Gender { get; set; } = Gender.Unspecified;
+    public decimal? Cgpa { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }

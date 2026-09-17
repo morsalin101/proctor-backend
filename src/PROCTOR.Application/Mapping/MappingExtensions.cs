@@ -115,6 +115,8 @@ public static class MappingExtensions
         IncidentLongitude = c.IncidentLongitude,
         IncidentLocationDescription = c.IncidentLocationDescription,
         StudentDepartment = c.StudentDepartment,
+        StudentSemester = c.StudentSemester,
+        StudentCgpa = c.StudentCgpa,
         StudentContact = c.StudentContact,
         StudentAdvisorName = c.StudentAdvisorName,
         StudentFatherName = c.StudentFatherName,

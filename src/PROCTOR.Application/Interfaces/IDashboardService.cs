@@ -7,4 +7,5 @@ public interface IDashboardService
 {
     Task<ApiResponse<DashboardStatsDto>> GetStatsAsync();
     Task<ApiResponse<List<RecentActivityDto>>> GetRecentActivityAsync();
+    Task<ApiResponse<DashboardAnalyticsDto>> GetAnalyticsAsync(DashboardFilter filter, string role, Guid? userId);
 }

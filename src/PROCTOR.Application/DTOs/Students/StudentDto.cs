@@ -9,6 +9,7 @@ public class StudentDto
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public string Gender { get; set; } = "unspecified";
+    public decimal? Cgpa { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }
@@ -24,6 +25,7 @@ public class CreateStudentRequest
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public string? Gender { get; set; }
+    public decimal? Cgpa { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }

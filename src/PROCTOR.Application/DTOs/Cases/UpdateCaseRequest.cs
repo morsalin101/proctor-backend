@@ -13,6 +13,8 @@ public class UpdateCaseRequest
 
     // Type-2 form fields
     public string? StudentDepartment { get; set; }
+    public int? StudentSemester { get; set; }
+    public decimal? StudentCgpa { get; set; }
     public string? StudentContact { get; set; }
     public string? StudentAdvisorName { get; set; }
     public string? StudentFatherName { get; set; }

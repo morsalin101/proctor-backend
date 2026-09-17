@@ -19,6 +19,7 @@ public static class DependencyInjection
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IDashboardAnalyticsRepository, DashboardAnalyticsRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IEmailService, DemoEmailService>();

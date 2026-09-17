@@ -9,7 +9,7 @@ public static class MenuPermissionSeeder
 {
     private static readonly string[] AllMenuKeys =
     {
-        "dashboard", "submit", "incidents", "cases", "hearings",
+        "dashboard", "advanced-search", "submit", "incidents", "cases", "hearings",
         "confidential", "monitoring", "reports", "users", "settings",
         "my-cases", "notifications"
     };
@@ -166,6 +166,40 @@ public static class MenuPermissionSeeder
         }
 
         if (changed) await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Give staff who can read cases the new search menu. Copy their case permissions so
+    /// existing role customizations remain in effect on already-seeded databases.
+    /// </summary>
+    public static async Task BackfillAdvancedSearchAsync(ProctorDbContext context)
+    {
+        var staffRoles = new[]
+        {
+            UserRole.Coordinator, UserRole.Proctor, UserRole.AssistantProctor,
+            UserRole.DeputyProctor, UserRole.Registrar, UserRole.DisciplinaryCommittee,
+            UserRole.FemaleCoordinator, UserRole.SexualHarassmentCommittee,
+            UserRole.VC, UserRole.SuperAdmin
+        };
+        var roleIds = staffRoles.Select(RoleSeeder.GetDeterministicGuid).ToArray();
+        var casePermissions = await context.MenuPermissions
+            .Where(p => roleIds.Contains(p.RoleId) && p.MenuKey == "cases" && p.CanRead)
+            .ToListAsync();
+        var existing = await context.MenuPermissions
+            .Where(p => roleIds.Contains(p.RoleId) && p.MenuKey == "advanced-search")
+            .Select(p => p.RoleId).ToListAsync();
+        var existingIds = existing.ToHashSet();
+        var additions = casePermissions.Where(p => !existingIds.Contains(p.RoleId))
+            .Select(p => new MenuPermission
+            {
+                Id = Guid.NewGuid(), RoleId = p.RoleId, MenuKey = "advanced-search",
+                CanCreate = p.CanCreate, CanRead = p.CanRead,
+                CanUpdate = p.CanUpdate, CanDelete = p.CanDelete,
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            }).ToList();
+        if (additions.Count == 0) return;
+        await context.MenuPermissions.AddRangeAsync(additions);
+        await context.SaveChangesAsync();
     }
 
     /// <summary>

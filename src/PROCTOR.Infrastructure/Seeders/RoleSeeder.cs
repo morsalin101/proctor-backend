@@ -69,7 +69,7 @@ public static class RoleSeeder
     {
         // "Coordinator" is a legacy enum key: the role IS the Proctor Office's
         // Administrative Officer and carries the same power as the Proctor.
-        UserRole.Coordinator => "Administrative Officer",
+        UserRole.Coordinator => "Assistant Administrative Officer",
         UserRole.FemaleCoordinator => "Female Administrative Officer",
         _ => InsertSpaces(role.ToString())
     };

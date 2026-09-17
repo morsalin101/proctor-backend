@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Students;
 using PROCTOR.Application.Mapping;
@@ -33,6 +34,7 @@ public class StudentsController : ControllerBase
         Contact = s.Contact,
         Email = s.Email,
         Gender = s.Gender.ToKebabCase(),
+        Cgpa = s.Cgpa,
         AdvisorName = s.AdvisorName,
         FatherName = s.FatherName,
         FatherContact = s.FatherContact,
@@ -46,6 +48,25 @@ public class StudentsController : ControllerBase
         var all = await _students.GetAllAsync();
         var dtos = all.OrderBy(s => s.StudentId).Select(ToDto).ToList();
         return Ok(ApiResponse<List<StudentDto>>.SuccessResponse(dtos));
+    }
+
+    [HttpGet("me")]
+    public async Task<IActionResult> GetCurrentStudent()
+    {
+        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var userId))
+            return Unauthorized();
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user is null || !user.IsActive || user.Role != UserRole.Student)
+            return Forbid();
+
+        var email = user.Email.ToLower();
+        var matches = await _students.FindAsync(s => s.IsActive && s.Email != null && s.Email.ToLower() == email);
+        var student = matches.FirstOrDefault();
+        if (student is null)
+            return NotFound(ApiResponse<StudentDto>.FailResponse("No student directory record is linked to this account."));
+
+        return Ok(ApiResponse<StudentDto>.SuccessResponse(ToDto(student)));
     }
 
     // Lookup by the university StudentId (e.g. "123") — used to auto-fill the case form.
@@ -67,6 +88,9 @@ public class StudentsController : ControllerBase
         if (string.IsNullOrWhiteSpace(sid) || string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(ApiResponse<StudentDto>.FailResponse("Student ID and name are required."));
 
+        if (request.Cgpa is < 0 or > 4)
+            return BadRequest(ApiResponse<StudentDto>.FailResponse("CGPA must be between 0 and 4."));
+
         var existing = await _students.FindAsync(s => s.StudentId == sid);
         if (existing.Any())
             return BadRequest(ApiResponse<StudentDto>.FailResponse("A student with that ID already exists."));
@@ -80,6 +104,7 @@ public class StudentsController : ControllerBase
             Contact = request.Contact,
             Email = request.Email,
             Gender = string.IsNullOrWhiteSpace(request.Gender) ? Gender.Unspecified : MappingExtensions.ParseEnum<Gender>(request.Gender),
+            Cgpa = request.Cgpa,
             AdvisorName = request.AdvisorName,
             FatherName = request.FatherName,
             FatherContact = request.FatherContact,

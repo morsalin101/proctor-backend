@@ -10,11 +10,16 @@ namespace PROCTOR.Application.Services;
 public class DashboardService : IDashboardService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDashboardAnalyticsRepository _analytics;
 
-    public DashboardService(IUnitOfWork unitOfWork)
+    public DashboardService(IUnitOfWork unitOfWork, IDashboardAnalyticsRepository analytics)
     {
         _unitOfWork = unitOfWork;
+        _analytics = analytics;
     }
+
+    public async Task<ApiResponse<DashboardAnalyticsDto>> GetAnalyticsAsync(DashboardFilter filter, string role, Guid? userId) =>
+        ApiResponse<DashboardAnalyticsDto>.SuccessResponse(await _analytics.GetAsync(filter, role, userId));
 
     public async Task<ApiResponse<DashboardStatsDto>> GetStatsAsync()
     {

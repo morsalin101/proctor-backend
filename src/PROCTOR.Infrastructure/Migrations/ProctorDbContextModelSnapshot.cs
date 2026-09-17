@@ -158,8 +158,14 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<string>("StudentContact")
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("StudentCgpa")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("StudentDepartment")
                         .HasColumnType("text");
+
+                    b.Property<int?>("StudentSemester")
+                        .HasColumnType("integer");
 
                     b.Property<string>("StudentFatherContact")
                         .HasColumnType("text");
@@ -916,6 +922,10 @@ namespace PROCTOR.Infrastructure.Migrations
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.Student", b =>
                 {
+                    b.Property<decimal?>("Cgpa")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");

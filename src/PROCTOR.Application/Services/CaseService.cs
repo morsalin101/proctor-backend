@@ -93,6 +93,8 @@ public class CaseService : ICaseService
 
     public async Task<ApiResponse<CaseDto>> CreateCaseAsync(CreateCaseRequest request, string createdBy, Guid? submittedByUserId = null)
     {
+        if (request.StudentSemester is < 1 or > 12 || request.StudentCgpa is < 0 or > 4)
+            return ApiResponse<CaseDto>.FailResponse("Semester must be 1–12 and CGPA must be 0–4.");
         var caseNumber = await _unitOfWork.Cases.GenerateCaseNumberAsync();
 
         // Resolve category and its confidentiality
@@ -126,6 +128,8 @@ public class CaseService : ICaseService
             IncidentLocationDescription = request.IncidentLocationDescription,
             Subject = request.Subject,
             StudentDepartment = request.StudentDepartment,
+            StudentSemester = request.StudentSemester is >= 1 and <= 12 ? request.StudentSemester : null,
+            StudentCgpa = request.StudentCgpa is >= 0 and <= 4 ? request.StudentCgpa : null,
             StudentContact = request.StudentContact,
             StudentAdvisorName = request.StudentAdvisorName,
             StudentFatherName = request.StudentFatherName,
@@ -301,6 +305,8 @@ public class CaseService : ICaseService
 
     public async Task<ApiResponse<CaseDto>> UpdateCaseAsync(Guid id, UpdateCaseRequest request)
     {
+        if (request.StudentSemester is < 1 or > 12 || request.StudentCgpa is < 0 or > 4)
+            return ApiResponse<CaseDto>.FailResponse("Semester must be 1–12 and CGPA must be 0–4.");
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
@@ -330,6 +336,8 @@ public class CaseService : ICaseService
         }
 
         if (request.StudentDepartment is not null) c.StudentDepartment = request.StudentDepartment;
+        if (request.StudentSemester is >= 1 and <= 12) c.StudentSemester = request.StudentSemester;
+        if (request.StudentCgpa is >= 0 and <= 4) c.StudentCgpa = request.StudentCgpa;
         if (request.StudentContact is not null) c.StudentContact = request.StudentContact;
         if (request.StudentAdvisorName is not null) c.StudentAdvisorName = request.StudentAdvisorName;
         if (request.StudentFatherName is not null) c.StudentFatherName = request.StudentFatherName;

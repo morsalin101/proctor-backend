@@ -18,6 +18,7 @@ public static class DbSeeder
         await MenuPermissionSeeder.BackfillMissingPermissionsAsync(context);
         await MenuPermissionSeeder.BackfillExternalRoleAsync(context);
         await MenuPermissionSeeder.BackfillAdministrativeOfficerAsync(context);
+        await MenuPermissionSeeder.BackfillAdvancedSearchAsync(context);
         await SystemSettingSeeder.SeedAsync(context);
         await SystemSettingSeeder.BackfillType1RolesAsync(context);
         await ForwardingRuleSeeder.SeedAsync(context);
@@ -26,6 +27,7 @@ public static class DbSeeder
         await CaseCategorySeeder.SeedAsync(context);
         await StudentSeeder.SeedAsync(context);
         await CaseSubjectSeeder.SeedAsync(context);
+        await CaseCategorySeeder.SeedBanglaAndMapAsync(context);
 
         // One-shot data hygiene: delete notifications whose case has been removed.
         // Self-guarded by a SystemSetting flag — safe to run on every startup.
