@@ -26,7 +26,6 @@ public static class DbSeeder
         await ForwardingRuleSeeder.RestrictAssignRolesAsync(context);
         await CaseCategorySeeder.SeedAsync(context);
         await StudentSeeder.SeedAsync(context);
-        await CaseSubjectSeeder.SeedAsync(context);
         await CaseCategorySeeder.SeedBanglaAndMapAsync(context);
 
         // One-shot data hygiene: delete notifications whose case has been removed.

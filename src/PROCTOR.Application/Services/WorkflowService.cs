@@ -148,6 +148,7 @@ public class WorkflowService : IWorkflowService
             ("proctor" or "coordinator", "registrar") => CaseStatus.ForwardedToRegistrar,
             ("registrar", "proctor") => CaseStatus.Assigned,
             ("registrar", "disciplinary-committee") => CaseStatus.ForwardedToCommittee,
+            ("proctor" or "sexual-harassment-committee", "disciplinary-committee") => CaseStatus.ForwardedToCommittee,
             ("sexual-harassment-committee", "assistant-proctor" or "deputy-proctor") => CaseStatus.Assigned,
             ("sexual-harassment-committee", "registrar") => CaseStatus.ForwardedToRegistrar,
             ("disciplinary-committee", "proctor") => CaseStatus.Assigned,

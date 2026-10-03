@@ -49,15 +49,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             query = query.Where(c => c.Type == type);
         if (!string.IsNullOrWhiteSpace(filter.Department))
             query = query.Where(c => c.StudentDepartment == filter.Department);
-        if (filter.SubjectId.HasValue)
-        {
-            var subjectId = filter.SubjectId.Value;
-            var subjectName = await _db.CaseSubjects.AsNoTracking()
-                .Where(s => s.Id == subjectId).Select(s => s.Subject).FirstOrDefaultAsync();
-            query = subjectName is null
-                ? query.Where(c => false)
-                : query.Where(c => (c.Category != null && c.Category.SubjectId == subjectId) || c.Subject == subjectName);
-        }
+        // filter.SubjectId removed
         if (filter.CategoryId.HasValue)
             query = query.Where(c => c.CategoryId == filter.CategoryId.Value);
         if (filter.Year.HasValue)
@@ -124,7 +116,11 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(c => new { c.Id, c.CaseNumber, c.StudentName, c.StudentId, c.StudentDepartment,
                 CategoryName = c.Category != null ? c.Category.Name : null,
-                c.StudentSemester, c.StudentCgpa, c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt })
+                c.StudentSemester, c.StudentCgpa, c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt,
+                AccusedName = c.AccusedPersons.FirstOrDefault() != null ? c.AccusedPersons.FirstOrDefault()!.Name : c.AccusedName,
+                ComplainantName = c.Complainants.FirstOrDefault() != null ? c.Complainants.FirstOrDefault()!.Name : c.StudentName,
+                Punishment = c.Verdict,
+                Collaborators = string.Join(", ", c.Assignments.Where(a => a.IsActive && !a.IsPrimary).Select(a => a.User!.Name)) })
             .ToListAsync();
         var activity = await _db.TimelineEvents.AsNoTracking()
             .Where(e => query.Any(c => c.Id == e.CaseId))
@@ -152,7 +148,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             Departments = departments,
             People = people.Select(p => new DashboardPersonDto(p.Id, p.Name, p.Role.ToKebabCase())).ToList(),
             Cases = cases.Select(c => new DashboardCaseDto(c.Id, c.CaseNumber, c.StudentName, c.StudentId,
-                c.StudentDepartment, c.CategoryName, c.StudentSemester, c.StudentCgpa, c.Status.ToKebabCase(), c.Type.ToKebabCase(), c.AssignedTo, c.CreatedAt)).ToList(),
+                c.StudentDepartment, c.CategoryName, c.StudentSemester, c.StudentCgpa, c.Status.ToKebabCase(), c.Type.ToKebabCase(), c.AssignedTo, c.CreatedAt, c.AccusedName, c.ComplainantName, c.Punishment, c.Collaborators)).ToList(),
             Activity = activity.Select(e => new DashboardActivityDto(e.CaseId, e.CaseNumber, e.Action, e.User, e.CreatedAt)).ToList(),
             Page = page,
             PageSize = pageSize

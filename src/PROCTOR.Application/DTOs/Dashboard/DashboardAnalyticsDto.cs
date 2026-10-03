@@ -6,7 +6,6 @@ public class DashboardFilter
     public string? Status { get; set; }
     public string? Type { get; set; }
     public string? Department { get; set; }
-    public Guid? SubjectId { get; set; }
     public Guid? CategoryId { get; set; }
     public string? ResponsibleRole { get; set; }
     public Guid? ResponsiblePersonId { get; set; }
@@ -49,6 +48,6 @@ public record DashboardGroupDto(string Name, int Count);
 public record DashboardPersonDto(Guid Id, string Name, string Role);
 public record DashboardCaseDto(Guid Id, string CaseNumber, string StudentName, string StudentId,
     string? Department, string? CategoryName, int? Semester, decimal? Cgpa, string Status, string Type,
-    string? AssignedTo, DateTime CreatedAt);
+    string? AssignedTo, DateTime CreatedAt, string? AccusedName, string? ComplainantName, string? Punishment, string? Collaborators);
 public record DashboardActivityDto(Guid CaseId, string CaseNumber, string Action,
     string User, DateTime Timestamp);

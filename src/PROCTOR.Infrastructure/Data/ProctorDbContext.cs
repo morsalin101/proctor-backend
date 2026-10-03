@@ -31,7 +31,6 @@ public class ProctorDbContext : DbContext
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<CaseAdditionalInfo> CaseAdditionalInfos => Set<CaseAdditionalInfo>();
-    public DbSet<CaseSubject> CaseSubjects => Set<CaseSubject>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,10 +41,6 @@ public class ProctorDbContext : DbContext
         {
             b.HasIndex(x => x.Name).IsUnique();
             b.Property(x => x.Name).HasMaxLength(120).IsRequired();
-            b.HasOne(x => x.Subject)
-                .WithMany()
-                .HasForeignKey(x => x.SubjectId)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CaseAssignment>(b =>

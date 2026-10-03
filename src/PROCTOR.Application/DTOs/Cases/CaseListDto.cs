@@ -24,7 +24,7 @@ public class CaseListDto
     public double? IncidentLatitude { get; set; }
     public double? IncidentLongitude { get; set; }
     public string? IncidentDate { get; set; }
-
+    public string? AcademicSemester { get; set; }
     public string? StudentDepartment { get; set; }
     public string? StudentContact { get; set; }
 

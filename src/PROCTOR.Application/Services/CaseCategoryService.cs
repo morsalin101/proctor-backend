@@ -52,7 +52,6 @@ public class CaseCategoryService : ICaseCategoryService
             IsActive = request.IsActive,
             AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType),
             SortOrder = request.SortOrder,
-            SubjectId = Guid.TryParse(request.SubjectId, out var subGuid) ? subGuid : null
         };
 
         await _repo.AddAsync(entity);
@@ -73,9 +72,6 @@ public class CaseCategoryService : ICaseCategoryService
         if (request.AppliesToType is not null)
             entity.AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType);
         if (request.SortOrder.HasValue) entity.SortOrder = request.SortOrder.Value;
-        // A non-null SubjectId means "set/clear the mapping"; empty/invalid clears it.
-        if (request.SubjectId is not null)
-            entity.SubjectId = Guid.TryParse(request.SubjectId, out var subGuid) ? subGuid : null;
 
         _repo.Update(entity);
         await _unitOfWork.SaveChangesAsync();

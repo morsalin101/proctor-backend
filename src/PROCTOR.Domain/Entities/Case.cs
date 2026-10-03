@@ -23,7 +23,7 @@ public class Case : BaseEntity
     public Gender SubmitterGender { get; set; } = Gender.Unspecified;
 
     // Type-2 form fields
-    public string? Subject { get; set; }
+    public string? AcademicSemester { get; set; }
     public string? StudentDepartment { get; set; }
     public int? StudentSemester { get; set; }
     public decimal? StudentCgpa { get; set; }

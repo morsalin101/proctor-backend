@@ -13,7 +13,6 @@ public class CaseDto
     public string StudentName { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
-    public string? Subject { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public string? AssignedTo { get; set; }
@@ -49,6 +48,7 @@ public class CaseDto
     public string? IncidentLocationDescription { get; set; }
 
     // Type-2 form fields
+    public string? AcademicSemester { get; set; }
     public string? StudentDepartment { get; set; }
     public int? StudentSemester { get; set; }
     public decimal? StudentCgpa { get; set; }

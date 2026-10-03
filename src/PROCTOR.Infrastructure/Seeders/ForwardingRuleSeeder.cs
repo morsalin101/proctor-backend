@@ -45,6 +45,7 @@ public static class ForwardingRuleSeeder
             new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "assistant-proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "deputy-proctor", ResultStatus = "assigned" },
             new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "registrar", ResultStatus = "forwarded-to-registrar" },
+            new() { Id = Guid.NewGuid(), FromRole = "sexual-harassment-committee", ToRole = "disciplinary-committee", ResultStatus = "forwarded-to-committee" },
             new() { Id = Guid.NewGuid(), FromRole = "disciplinary-committee", ToRole = "proctor", ResultStatus = "assigned" },
         };
 

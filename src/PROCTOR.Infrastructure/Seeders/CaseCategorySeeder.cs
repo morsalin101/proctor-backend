@@ -27,63 +27,28 @@ public static class CaseCategorySeeder
             ("মাদক ও নিষিদ্ধ দ্রব্য", "মাদক ব্যবহার", "মাদক বা নিষিদ্ধ দ্রব্য ব্যবহার সংক্রান্ত অভিযোগ।", true),
         };
 
-        var subjects = await context.CaseSubjects.ToListAsync();
         var categories = await context.CaseCategories.ToListAsync();
         var now = DateTime.UtcNow;
-        var subjectOrder = Math.Max(100, subjects.Select(s => s.Order).DefaultIfEmpty(0).Max() + 1);
         var categoryOrder = Math.Max(100, categories.Select(c => c.SortOrder).DefaultIfEmpty(0).Max() + 1);
 
         foreach (var choice in choices)
         {
-            var subject = subjects.FirstOrDefault(s => string.Equals(s.Subject, choice.Subject, StringComparison.OrdinalIgnoreCase));
-            if (subject is null)
-            {
-                subject = new CaseSubject { Id = Guid.NewGuid(), Subject = choice.Subject,
-                    Order = subjectOrder++, IsActive = true, CreatedAt = now, UpdatedAt = now };
-                context.CaseSubjects.Add(subject);
-                subjects.Add(subject);
-            }
-
             var category = categories.FirstOrDefault(c => string.Equals(c.Name, choice.Category, StringComparison.OrdinalIgnoreCase));
             if (category is null)
             {
                 category = new CaseCategory { Id = Guid.NewGuid(), Name = choice.Category,
                     Description = choice.Description, IsConfidential = choice.Confidential,
-                    AppliesToType = CaseCategoryAppliesTo.Type2, SubjectId = subject.Id,
+                    AppliesToType = CaseCategoryAppliesTo.Type2,
                     SortOrder = categoryOrder++, IsActive = true, CreatedAt = now, UpdatedAt = now };
                 context.CaseCategories.Add(category);
                 categories.Add(category);
             }
-            else if (category.SubjectId is null)
-            {
-                category.SubjectId = subject.Id;
-                category.UpdatedAt = now;
-            }
-        }
-
-        // Existing English defaults also need a subject link for the Type-2 form.
-        var englishMappings = new Dictionary<string, string>
-        {
-            ["Ragging"] = "Ragging / Bullying",
-            ["Cheating"] = "Examination Malpractice / Cheating",
-            ["Misconduct"] = "Misconduct in Hall / Dormitory",
-            ["Property Damage"] = "Property Damage / Vandalism",
-            ["Harassment"] = "Sexual Harassment",
-            ["Substance Abuse"] = "Drug / Substance Abuse",
-        };
-        foreach (var (categoryName, subjectName) in englishMappings)
-        {
-            var category = categories.FirstOrDefault(c => c.Name == categoryName && c.SubjectId is null);
-            var subject = subjects.FirstOrDefault(s => s.Subject == subjectName);
-            if (category is null || subject is null) continue;
-            category.SubjectId = subject.Id;
-            category.UpdatedAt = now;
         }
 
         context.SystemSettings.Add(new SystemSetting
         {
             Id = Guid.NewGuid(), Key = seedKey, Value = "true", Category = "maintenance",
-            Description = "Bangla case subjects and mapped categories seeded.",
+            Description = "Bangla case categories seeded.",
             CreatedAt = now, UpdatedAt = now
         });
         await context.SaveChangesAsync();

@@ -70,7 +70,22 @@ public class CaseService : ICaseService
         // The Female Coordinator keeps her own track — plus every instant (Type-1) incident,
         // which is an emergency the whole proctorial team responds to regardless of gender.
         if (role == "female-coordinator") return IsFemaleTrack(c) || c.Type == CaseType.Type1;
+        
+        if (role == "sexual-harassment-committee") return c.ForwardedToRole == "sexual-harassment-committee";
+        
         return true;
+    }
+
+    private static string GetAcademicSemester(DateTime? incidentDate)
+    {
+        var month = (incidentDate ?? DateTime.UtcNow).Month;
+        return month switch
+        {
+            >= 1 and <= 4 => "Spring",
+            >= 5 and <= 8 => "Summer",
+            >= 9 and <= 12 => "Fall",
+            _ => "Spring"
+        };
     }
 
     public async Task<ApiResponse<CaseDto>> GetCaseByIdAsync(Guid id, string? userRole = null)
@@ -126,7 +141,7 @@ public class CaseService : ICaseService
             IncidentLatitude = request.IncidentLatitude,
             IncidentLongitude = request.IncidentLongitude,
             IncidentLocationDescription = request.IncidentLocationDescription,
-            Subject = request.Subject,
+            AcademicSemester = GetAcademicSemester(request.IncidentDate is not null ? DateTime.Parse(request.IncidentDate) : null),
             StudentDepartment = request.StudentDepartment,
             StudentSemester = request.StudentSemester is >= 1 and <= 12 ? request.StudentSemester : null,
             StudentCgpa = request.StudentCgpa is >= 0 and <= 4 ? request.StudentCgpa : null,
@@ -348,7 +363,11 @@ public class CaseService : ICaseService
         if (request.AccusedContact is not null) c.AccusedContact = request.AccusedContact;
         if (request.AccusedGuardianContact is not null) c.AccusedGuardianContact = request.AccusedGuardianContact;
         if (request.VideoLink is not null) c.VideoLink = request.VideoLink;
-        if (request.IncidentDate is not null) c.IncidentDate = DateTime.Parse(request.IncidentDate).ToUniversalTime();
+        if (request.IncidentDate is not null) 
+        {
+            c.IncidentDate = DateTime.Parse(request.IncidentDate).ToUniversalTime();
+            c.AcademicSemester = GetAcademicSemester(c.IncidentDate);
+        }
 
         if (request.Complainants is not null)
         {
@@ -776,6 +795,19 @@ public class CaseService : ICaseService
         }
 
         await _unitOfWork.SaveChangesAsync();
+
+        if (request.TargetRole == "disciplinary-committee")
+        {
+            _unitOfWork.Add(new Report
+            {
+                Id = Guid.NewGuid(),
+                CaseId = c.Id,
+                Content = "Disciplinary Committee Report",
+                CreatedByName = "System",
+                CreatedById = Guid.Empty
+            });
+            await _unitOfWork.SaveChangesAsync();
+        }
 
         await _notificationService.CreateAsync(null, request.TargetRole,
             "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);

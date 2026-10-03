@@ -88,7 +88,6 @@ public static class MappingExtensions
         StudentName = c.StudentName,
         StudentId = c.StudentId,
         Type = c.Type.ToKebabCase(),
-        Subject = c.Subject,
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
@@ -114,6 +113,7 @@ public static class MappingExtensions
         IncidentLatitude = c.IncidentLatitude,
         IncidentLongitude = c.IncidentLongitude,
         IncidentLocationDescription = c.IncidentLocationDescription,
+        AcademicSemester = c.AcademicSemester,
         StudentDepartment = c.StudentDepartment,
         StudentSemester = c.StudentSemester,
         StudentCgpa = c.StudentCgpa,
@@ -177,8 +177,7 @@ public static class MappingExtensions
         IsConfidential = c.IsConfidential,
         IsActive = c.IsActive,
         AppliesToType = c.AppliesToType.ToKebabCase(),
-        SortOrder = c.SortOrder,
-        SubjectId = c.SubjectId?.ToString()
+        SortOrder = c.SortOrder
     };
 
     public static CaseListDto ToListDto(this Case c) => new()
@@ -203,6 +202,7 @@ public static class MappingExtensions
         IncidentLatitude = c.IncidentLatitude,
         IncidentLongitude = c.IncidentLongitude,
         IncidentDate = c.IncidentDate?.ToString("o"),
+        AcademicSemester = c.AcademicSemester,
         StudentDepartment = c.StudentDepartment,
         StudentContact = c.StudentContact,
         AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),

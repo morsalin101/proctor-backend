@@ -9,7 +9,6 @@ public class CaseCategoryDto
     public bool IsActive { get; set; }
     public string AppliesToType { get; set; } = "both";
     public int SortOrder { get; set; }
-    public string? SubjectId { get; set; }
 }
 
 public class CreateCaseCategoryRequest
@@ -20,7 +19,6 @@ public class CreateCaseCategoryRequest
     public bool IsActive { get; set; } = true;
     public string AppliesToType { get; set; } = "both";
     public int SortOrder { get; set; }
-    public string? SubjectId { get; set; }
 }
 
 public class UpdateCaseCategoryRequest
@@ -31,5 +29,4 @@ public class UpdateCaseCategoryRequest
     public bool? IsActive { get; set; }
     public string? AppliesToType { get; set; }
     public int? SortOrder { get; set; }
-    public string? SubjectId { get; set; }
 }

@@ -112,6 +112,9 @@ public class CaseRepository : Repository<Case>, ICaseRepository
                 c.Type == CaseType.Confidential
                 || c.Type == CaseType.Type1
                 || c.SubmitterGender == Gender.Female);
+        
+        if (userRole == "sexual-harassment-committee")
+            query = query.Where(c => c.ForwardedToRole == "sexual-harassment-committee");
 
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);
@@ -128,7 +131,9 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             query = query.Where(c =>
                 c.CaseNumber.ToLower().Contains(searchLower) ||
                 c.StudentName.ToLower().Contains(searchLower) ||
-                c.Description.ToLower().Contains(searchLower));
+                c.Description.ToLower().Contains(searchLower) ||
+                (c.AccusedName != null && c.AccusedName.ToLower().Contains(searchLower)) ||
+                c.AccusedPersons.Any(a => a.Name.ToLower().Contains(searchLower)));
         }
 
         return query;

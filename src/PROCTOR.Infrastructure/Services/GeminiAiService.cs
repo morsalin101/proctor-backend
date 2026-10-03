@@ -369,7 +369,6 @@ public class GeminiAiService : IAiService
         facts.Append(Line("Case type", c.Type.ToString()));
         facts.Append(Line("Status", c.Status.ToString()));
         facts.Append(Line("Priority", c.Priority.ToString()));
-        facts.Append(Line("Subject", c.Subject));
         facts.Append(Line("Category", c.Category?.Name));
         facts.Append(Line("Submitted on", c.CreatedAt.ToString("yyyy-MM-dd")));
         facts.Append(Line("Incident date", c.IncidentDate?.ToString("yyyy-MM-dd")));
