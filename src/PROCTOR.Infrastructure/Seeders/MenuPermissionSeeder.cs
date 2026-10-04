@@ -63,20 +63,12 @@ public static class MenuPermissionSeeder
         AddPermissions(permissions, UserRole.Registrar, new Dictionary<string, string>
         {
             ["dashboard"] = "R",
-            ["cases"] = "RU",
-            ["my-cases"] = "R",
-            ["notifications"] = "R",
-            ["reports"] = "R",
             ["settings"] = "RU"
         });
 
         AddPermissions(permissions, UserRole.DisciplinaryCommittee, new Dictionary<string, string>
         {
             ["dashboard"] = "R",
-            ["cases"] = "RU",
-            ["my-cases"] = "R",
-            ["notifications"] = "R",
-            ["hearings"] = "CRUD",
             ["reports"] = "R",
             ["settings"] = "RU"
         });
@@ -98,12 +90,6 @@ public static class MenuPermissionSeeder
         AddPermissions(permissions, UserRole.VC, new Dictionary<string, string>
         {
             ["dashboard"] = "R",
-            ["incidents"] = "R",
-            ["cases"] = "R",
-            ["confidential"] = "R",
-            ["monitoring"] = "CRUD",
-            ["reports"] = "R",
-            ["users"] = "R",
             ["settings"] = "RU"
         });
 

@@ -194,6 +194,7 @@ public static class MappingExtensions
         CreatedDate = c.CreatedAt.ToString("o"),
         UpdatedDate = c.UpdatedAt.ToString("o"),
         Description = c.Description,
+        Verdict = c.Verdict,
         ForwardedToRole = c.ForwardedToRole,
         CategoryName = c.Category?.Name,
         CategoryIsConfidential = c.Category?.IsConfidential ?? false,
@@ -206,7 +207,8 @@ public static class MappingExtensions
         StudentDepartment = c.StudentDepartment,
         StudentContact = c.StudentContact,
         AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
-        Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList()
+        Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
+        Reports = c.Reports.Select(x => x.ToDto()).ToList()
     };
 
     public static DocumentDto ToDto(this Document d) => new()

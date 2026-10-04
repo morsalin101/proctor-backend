@@ -78,14 +78,16 @@ public class CaseService : ICaseService
 
     private static string GetAcademicSemester(DateTime? incidentDate)
     {
-        var month = (incidentDate ?? DateTime.UtcNow).Month;
-        return month switch
+        var dt = incidentDate ?? DateTime.UtcNow;
+        var month = dt.Month;
+        var term = month switch
         {
             >= 1 and <= 4 => "Spring",
             >= 5 and <= 8 => "Summer",
             >= 9 and <= 12 => "Fall",
             _ => "Spring"
         };
+        return $"{term}-{dt.Year}";
     }
 
     public async Task<ApiResponse<CaseDto>> GetCaseByIdAsync(Guid id, string? userRole = null)
@@ -246,7 +248,7 @@ public class CaseService : ICaseService
                 AssignedById = submittedByUserId,
                 AssignedAt = DateTime.UtcNow,
                 IsActive = true,
-                IsPrimary = true
+                IsPrimary = false
             });
         }
 
@@ -536,6 +538,8 @@ public class CaseService : ICaseService
                 existing.IsActive = false;
         }
 
+        var newlyAssigned = new List<Guid>();
+
         // Add new assignments for users not already active
         foreach (var uid in userGuids)
         {
@@ -557,9 +561,11 @@ public class CaseService : ICaseService
                 // parent's navigation collection lets EF treat the client-set Guid key as an
                 // existing row and emit an UPDATE that matches 0 rows (the reported 500).
                 _unitOfWork.Add(assignment);
+                newlyAssigned.Add(uid);
             }
             else
             {
+                if (!existing.IsActive) newlyAssigned.Add(uid);
                 existing.IsActive = true;
                 existing.IsPrimary = primaryGuid.HasValue ? uid == primaryGuid.Value : existing.IsPrimary;
             }
@@ -602,7 +608,7 @@ public class CaseService : ICaseService
 
         await _unitOfWork.SaveChangesAsync();
 
-        foreach (var uid in userGuids)
+        foreach (var uid in newlyAssigned)
         {
             await _notificationService.CreateAsync(uid, null, "Case Assigned to You",
                 $"You have been assigned to case {c.CaseNumber}.", c.Id);
@@ -610,7 +616,7 @@ public class CaseService : ICaseService
 
         // The complainant is told exactly who is handling their case and how to reach them —
         // name, role and contact number, so they are never left guessing.
-        if (c.SubmittedByUserId.HasValue)
+        if (c.SubmittedByUserId.HasValue && newlyAssigned.Count > 0)
         {
             var handlers = new List<User>();
             foreach (var uid in userGuids)
@@ -743,7 +749,7 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case status updated successfully.");
     }
 
-    public async Task<ApiResponse<CaseDto>> ForwardCaseAsync(Guid id, ForwardCaseRequest request, string updatedBy, string userRole)
+    public async Task<ApiResponse<CaseDto>> ForwardCaseAsync(Guid id, ForwardCaseRequest request, string updatedBy, string userRole, Guid actingUserId)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
@@ -764,7 +770,31 @@ public class CaseService : ICaseService
         c.ForwardedToRole = request.TargetRole;
 
         if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var assigneeId))
-            c.AssignedToId = assigneeId;
+        {
+            var existing = c.Assignments.FirstOrDefault(a => a.UserId == assigneeId);
+            if (existing == null)
+            {
+                var isFirst = !c.Assignments.Any(a => a.IsActive && a.IsPrimary);
+                var assignment = new CaseAssignment
+                {
+                    Id = Guid.NewGuid(),
+                    CaseId = c.Id,
+                    UserId = assigneeId,
+                    AssignedById = actingUserId,
+                    AssignedAt = DateTime.UtcNow,
+                    IsActive = true,
+                    IsPrimary = isFirst
+                };
+                c.Assignments.Add(assignment);
+                _unitOfWork.Add(assignment);
+
+                if (isFirst) c.AssignedToId = assigneeId;
+            }
+            else if (!existing.IsActive)
+            {
+                existing.IsActive = true;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Recommendation))
             c.Recommendation = request.Recommendation;
@@ -811,6 +841,12 @@ public class CaseService : ICaseService
 
         await _notificationService.CreateAsync(null, request.TargetRole,
             "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);
+
+        if (request.TargetRole == "proctor")
+        {
+            await _notificationService.CreateAsync(null, "coordinator",
+                "Case Forwarded to Proctor", $"Case {c.CaseNumber} has been forwarded to the Proctor by {updatedBy}.", c.Id);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var notifyUserId))
         {
@@ -884,6 +920,15 @@ public class CaseService : ICaseService
         report.IsFinal = request.IsFinal;
         report.SectionsJson = request.SectionsJson;
         report.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = caseId,
+            Action = request.IsFinal ? "Report Finalized" : (request.IsDraft ? "Draft Report Updated" : "Report Updated"),
+            Description = request.IsFinal ? $"Final report submitted by {updatedByName}." : $"Report updated by {updatedByName}.",
+            User = updatedByName
+        });
 
         await _unitOfWork.SaveChangesAsync();
         return ApiResponse<ReportDto>.SuccessResponse(report.ToDto(), "Report updated.");
