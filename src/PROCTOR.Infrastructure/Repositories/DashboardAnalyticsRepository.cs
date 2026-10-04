@@ -54,8 +54,8 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             query = query.Where(c => c.CategoryId == filter.CategoryId.Value);
         if (filter.Year.HasValue)
             query = query.Where(c => c.CreatedAt.Year == filter.Year.Value);
-        if (filter.Semester.HasValue)
-            query = query.Where(c => c.StudentSemester == filter.Semester.Value);
+        if (!string.IsNullOrWhiteSpace(filter.Semester))
+            query = query.Where(c => c.AcademicSemester == filter.Semester);
         if (filter.MinCgpa.HasValue)
             query = query.Where(c => c.StudentCgpa >= filter.MinCgpa.Value);
         if (filter.MaxCgpa.HasValue)
@@ -88,7 +88,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             .OrderBy(g => g.Year).ThenBy(g => g.Month).ToListAsync();
         var yearRows = await query.GroupBy(c => c.CreatedAt.Year)
             .Select(g => new { Year = g.Key, Count = g.Count() }).OrderBy(g => g.Year).ToListAsync();
-        var semesterRows = await query.GroupBy(c => c.StudentSemester)
+        var semesterRows = await query.GroupBy(c => c.AcademicSemester)
             .Select(g => new { Semester = g.Key, Count = g.Count() }).OrderBy(g => g.Semester).ToListAsync();
         var typeRows = await query.GroupBy(c => c.Type)
             .Select(g => new { Type = g.Key, Count = g.Count() }).ToListAsync();
@@ -116,7 +116,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(c => new { c.Id, c.CaseNumber, c.StudentName, c.StudentId, c.StudentDepartment,
                 CategoryName = c.Category != null ? c.Category.Name : null,
-                c.StudentSemester, c.StudentCgpa, c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt,
+                c.AcademicSemester, c.StudentSemester, c.StudentCgpa, c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt,
                 AccusedName = c.AccusedPersons.FirstOrDefault() != null ? c.AccusedPersons.FirstOrDefault()!.Name : c.AccusedName,
                 ComplainantName = c.Complainants.FirstOrDefault() != null ? c.Complainants.FirstOrDefault()!.Name : c.StudentName,
                 Punishment = c.Verdict,
@@ -138,7 +138,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             Type2Pending = await open.CountAsync(c => c.Type == CaseType.Type2 || c.Type == CaseType.Confidential),
             MonthlyTrend = monthRows.Select(x => new DashboardGroupDto($"{x.Year}-{x.Month:00}", x.Count)).ToList(),
             YearlyTrend = yearRows.Select(x => new DashboardGroupDto(x.Year.ToString(), x.Count)).ToList(),
-            Semesters = semesterRows.Select(x => new DashboardGroupDto(x.Semester?.ToString() ?? "Unknown", x.Count)).ToList(),
+            Semesters = semesterRows.Select(x => new DashboardGroupDto(x.Semester ?? "Unknown", x.Count)).ToList(),
             CaseTypes = typeRows.Select(x => new DashboardGroupDto(x.Type.ToKebabCase(), x.Count)).ToList(),
             Categories = categoryRows.Select(x => new DashboardGroupDto(x.Name ?? "Uncategorized", x.Count)).ToList(),
             CgpaRanges = cgpaRows.Select(x => new DashboardGroupDto(x.Bucket switch

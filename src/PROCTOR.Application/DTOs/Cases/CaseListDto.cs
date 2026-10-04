@@ -1,3 +1,5 @@
+using PROCTOR.Application.DTOs.Reports;
+
 namespace PROCTOR.Application.DTOs.Cases;
 
 public class CaseListDto
@@ -15,6 +17,7 @@ public class CaseListDto
     public string UpdatedDate { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string? ForwardedToRole { get; set; }
+    public string? Verdict { get; set; }
 
     public string? CategoryName { get; set; }
     public bool CategoryIsConfidential { get; set; }
@@ -30,4 +33,5 @@ public class CaseListDto
 
     public List<CaseAccusedDto> AccusedPersons { get; set; } = new();
     public List<CaseComplainantDto> Complainants { get; set; } = new();
+    public List<ReportDto> Reports { get; set; } = new();
 }

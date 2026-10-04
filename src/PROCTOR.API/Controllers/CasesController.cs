@@ -145,7 +145,8 @@ public class CasesController : ControllerBase
     {
         var updatedBy = GetCurrentUserName();
         var userRole = GetCurrentUserRole();
-        var response = await _caseService.ForwardCaseAsync(id, request, updatedBy, userRole);
+        var actingUserId = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : Guid.Empty;
+        var response = await _caseService.ForwardCaseAsync(id, request, updatedBy, userRole, actingUserId);
         if (!response.Success)
             return BadRequest(response);
 

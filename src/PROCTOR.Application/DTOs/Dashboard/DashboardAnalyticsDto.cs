@@ -10,7 +10,7 @@ public class DashboardFilter
     public string? ResponsibleRole { get; set; }
     public Guid? ResponsiblePersonId { get; set; }
     public int? Year { get; set; }
-    public int? Semester { get; set; }
+    public string? Semester { get; set; }
     public decimal? MinCgpa { get; set; }
     public decimal? MaxCgpa { get; set; }
     public DateTime? From { get; set; }

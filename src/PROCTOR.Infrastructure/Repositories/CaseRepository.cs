@@ -116,6 +116,9 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         if (userRole == "sexual-harassment-committee")
             query = query.Where(c => c.ForwardedToRole == "sexual-harassment-committee");
 
+        if (userRole == "disciplinary-committee")
+            query = query.Where(c => c.ForwardedToRole == "disciplinary-committee");
+
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);
 
