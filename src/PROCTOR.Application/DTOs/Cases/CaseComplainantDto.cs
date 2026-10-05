@@ -20,6 +20,7 @@ public class CaseAccusedDto
     public string? Department { get; set; }
     public string? Contact { get; set; }
     public string? GuardianContact { get; set; }
+    public decimal? Cgpa { get; set; }
 }
 
 public class CreateCaseComplainantRequest
@@ -40,4 +41,5 @@ public class CreateCaseAccusedRequest
     public string? Department { get; set; }
     public string? Contact { get; set; }
     public string? GuardianContact { get; set; }
+    public decimal? Cgpa { get; set; }
 }

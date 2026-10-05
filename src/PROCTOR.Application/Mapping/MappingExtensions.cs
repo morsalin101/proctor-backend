@@ -325,6 +325,7 @@ public static class MappingExtensions
     public static CaseAccusedDto ToDto(this CaseAccused a) => new()
     {
         Id = a.Id.ToString(), Name = a.Name, AccusedStudentId = a.AccusedStudentId,
-        Department = a.Department, Contact = a.Contact, GuardianContact = a.GuardianContact
+        Department = a.Department, Contact = a.Contact, GuardianContact = a.GuardianContact,
+        Cgpa = a.Cgpa
     };
 }

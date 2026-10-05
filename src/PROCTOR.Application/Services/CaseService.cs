@@ -198,7 +198,8 @@ public class CaseService : ICaseService
                 {
                     Id = Guid.NewGuid(), CaseId = newCase.Id, Name = a.Name,
                     AccusedStudentId = a.AccusedStudentId, Department = a.Department,
-                    Contact = a.Contact, GuardianContact = a.GuardianContact, Order = order++
+                    Contact = a.Contact, GuardianContact = a.GuardianContact,
+                    Cgpa = a.Cgpa, Order = order++
                 });
             }
         }
@@ -402,7 +403,8 @@ public class CaseService : ICaseService
                 {
                     Id = Guid.NewGuid(), CaseId = c.Id, Name = a.Name,
                     AccusedStudentId = a.AccusedStudentId, Department = a.Department,
-                    Contact = a.Contact, GuardianContact = a.GuardianContact, Order = order++
+                    Contact = a.Contact, GuardianContact = a.GuardianContact,
+                    Cgpa = a.Cgpa, Order = order++
                 };
                 c.AccusedPersons.Add(acc);
                 _unitOfWork.Add(acc); // force INSERT (client-set Guid key)

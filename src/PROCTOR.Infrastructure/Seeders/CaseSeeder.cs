@@ -9,8 +9,8 @@ public static class CaseSeeder
 {
     public static async Task SeedAsync(ProctorDbContext context)
     {
-        // Check if cases are already seeded
-        if (await context.Cases.AnyAsync()) return;
+        // Check if Bangla cases are already seeded
+        if (await context.Cases.AnyAsync(c => c.Description.Contains("ঘটেছে"))) return;
 
         var categories = await context.CaseCategories.Where(c => c.IsActive).ToListAsync();
         var studentUser = await context.Users.FirstOrDefaultAsync(u => u.Role == UserRole.Student);
@@ -19,10 +19,10 @@ public static class CaseSeeder
 
         var rand = new Random(42); // deterministic for reproducible seeds
 
-        var firstNamesMale = new[] { "Rahim", "Karim", "Tariqul", "Tanvir", "Md. Al Amin", "Arafat", "Hasan", "Kamrul", "Sabbir", "Mehedi" };
-        var firstNamesFemale = new[] { "Sadia", "Farhana", "Samiha", "Nusrat", "Tasnim", "Fariha", "Jannatul", "Sumaiya" };
-        var lastNames = new[] { "Uddin", "Hossain", "Islam", "Rahman", "Ahmed", "Haque", "Akter", "Jahan", "Chowdhury", "Khan" };
-        var departments = new[] { "CSE", "SWE", "BBA", "EEE", "TE", "Civil", "English", "Law" };
+        var firstNamesMale = new[] { "রহিম", "করিম", "তরিকুল", "তানভীর", "মোঃ আল আমিন", "আরাফাত", "হাসান", "কামরুল", "সাব্বির", "মেহেদী" };
+        var firstNamesFemale = new[] { "সাদিয়া", "ফারহানা", "সামিহা", "নুসরাত", "তাসনিম", "ফারিহা", "জান্নাতুল", "সুমাইয়া" };
+        var lastNames = new[] { "উদ্দিন", "হোসেন", "ইসলাম", "রহমান", "আহমেদ", "হক", "আক্তার", "জাহান", "চৌধুরী", "খান" };
+        var departments = new[] { "সিএসই", "সফটওয়্যার ইঞ্জিনিয়ারিং", "বিবিএ", "ত্রিপল-ই", "টেক্সটাইল", "সিভিল", "ইংরেজি", "আইন" };
 
         var cases = new List<Case>();
 
@@ -53,13 +53,13 @@ public static class CaseSeeder
             var newCase = new Case
             {
                 Id = Guid.NewGuid(),
-                CaseNumber = $"DIU-{DateTime.UtcNow.Year}-{i.ToString("D4")}",
+                CaseNumber = $"DIU-{DateTime.UtcNow.Year}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}",
                 StudentName = studentName,
                 StudentId = $"0{rand.Next(1, 9)}{rand.Next(1, 3)}-{rand.Next(11, 40)}-{rand.Next(1000, 9999)}",
                 Type = type,
                 Status = CaseStatus.Submitted,
                 Priority = type == CaseType.Type1 ? Priority.High : Priority.Medium,
-                Description = $"This is a dummy case description for {studentName} regarding an incident in {dept} department.",
+                Description = $"এটি {dept} বিভাগে {studentName} এর সাথে ঘটে যাওয়া একটি ঘটনার ডামি কেস। ঘটনাটি সম্পর্কে বিস্তারিত তদন্তের জন্য অভিযোগটি দাখিল করা হলো।",
                 SubmittedByUserId = studentUser.Id,
                 SubmitterGender = isMale ? Gender.Male : Gender.Female,
                 CategoryId = category.Id,

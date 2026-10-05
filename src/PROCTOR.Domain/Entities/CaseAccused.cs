@@ -8,6 +8,7 @@ public class CaseAccused : BaseEntity
     public string? Department { get; set; }
     public string? Contact { get; set; }
     public string? GuardianContact { get; set; }
+    public decimal? Cgpa { get; set; }
     public int Order { get; set; }
 
     public Case Case { get; set; } = null!;
