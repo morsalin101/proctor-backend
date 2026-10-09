@@ -5,6 +5,7 @@ public class ForwardingRuleDto
     public string Id { get; set; } = string.Empty;
     public string FromRole { get; set; } = string.Empty;
     public string ToRole { get; set; } = string.Empty;
+    public string AppliesToType { get; set; } = "type-2";
     public string? ResultStatus { get; set; }
     public bool IsActive { get; set; }
 }
@@ -13,6 +14,7 @@ public class CreateForwardingRuleRequest
 {
     public string FromRole { get; set; } = string.Empty;
     public string ToRole { get; set; } = string.Empty;
+    public string AppliesToType { get; set; } = "type-2";
     public string? ResultStatus { get; set; }
 }
 

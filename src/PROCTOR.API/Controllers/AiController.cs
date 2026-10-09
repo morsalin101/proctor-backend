@@ -14,11 +14,19 @@ public class AiController : ControllerBase
 {
     private readonly IAiService _aiService;
     private readonly IForwardingRuleService _forwardingRuleService;
+    private readonly ICaseService _caseService;
+    private readonly IPermissionChecker _permissionChecker;
 
-    public AiController(IAiService aiService, IForwardingRuleService forwardingRuleService)
+    public AiController(
+        IAiService aiService,
+        IForwardingRuleService forwardingRuleService,
+        ICaseService caseService,
+        IPermissionChecker permissionChecker)
     {
         _aiService = aiService;
         _forwardingRuleService = forwardingRuleService;
+        _caseService = caseService;
+        _permissionChecker = permissionChecker;
     }
 
     private string GetCurrentUserRole() => User.FindFirst("role")?.Value ?? "";
@@ -45,14 +53,19 @@ public class AiController : ControllerBase
         return Ok(await _aiService.TestConnectionAsync(request));
     }
 
-    // Drafting a report is gated by the same __draft_report__ permission as writing one by hand.
+    // AI drafting follows the same authorization rule as manual report creation.
     [HttpPost("cases/{caseId:guid}/report")]
     public async Task<IActionResult> GenerateReport(Guid caseId, [FromBody] GenerateReportRequest request)
     {
         var role = GetCurrentUserRole();
-        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role);
-        if (!(special.Data?.CanDraftReport ?? false))
-            return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have draft report permission."));
+        var caseResponse = await _caseService.GetCaseByIdAsync(caseId, role);
+        if (!caseResponse.Success || caseResponse.Data is null)
+            return NotFound(caseResponse);
+        var canCreateFromMenu = await _permissionChecker.HasPermissionAsync(role, "reports", "create");
+        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
+        if (!canCreateFromMenu && !(special.Data?.CanDraftReport ?? false))
+            return StatusCode(403, ApiResponse<object>.FailResponse(
+                "Your role cannot create reports. Enable Pending Reports → Create or the case-type Create draft report permission."));
 
         var response = await _aiService.GenerateCaseReportAsync(caseId, request);
         if (!response.Success) return BadRequest(response);

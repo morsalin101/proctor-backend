@@ -2,12 +2,12 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using PROCTOR.Domain.Entities;
 
 using PROCTOR.Application.Interfaces;
+using PROCTOR.Application.Mapping;
 
 namespace PROCTOR.Infrastructure.Services;
 
@@ -30,7 +30,9 @@ public class JwtTokenService : IJwtTokenService
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim("role", ToKebabCase(user.Role.ToString())),
+            // Use the application's enum mapper so acronym roles remain stable:
+            // VC -> "vc" and DCChairman -> "dc-chairman" (not "v-c" / "d-c-chairman").
+            new Claim("role", user.Role.ToKebabCase()),
             new Claim("name", user.Name)
         };
 
@@ -52,10 +54,5 @@ public class JwtTokenService : IJwtTokenService
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomBytes);
         return Convert.ToBase64String(randomBytes);
-    }
-
-    private static string ToKebabCase(string value)
-    {
-        return Regex.Replace(value, "(?<!^)([A-Z])", "-$1").ToLower();
     }
 }

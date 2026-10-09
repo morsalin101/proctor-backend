@@ -1,12 +1,14 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using PROCTOR.API.Middleware;
 using PROCTOR.Application;
+using PROCTOR.Application.Mapping;
 using PROCTOR.Infrastructure;
 using PROCTOR.Infrastructure.Data;
 using PROCTOR.Infrastructure.Seeders;
@@ -68,6 +70,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = "name",
             RoleClaimType = "role"
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                if (context.Principal?.Identity is not ClaimsIdentity identity) return Task.CompletedTask;
+                var roleClaim = identity.FindFirst("role");
+                if (roleClaim is null) return Task.CompletedTask;
+                var normalizedRole = roleClaim.Value.NormalizeRoleKey();
+                if (normalizedRole == roleClaim.Value) return Task.CompletedTask;
+                identity.RemoveClaim(roleClaim);
+                identity.AddClaim(new Claim("role", normalizedRole));
+                return Task.CompletedTask;
+            }
+        };
     });
 
 // CORS
@@ -111,6 +127,7 @@ Directory.CreateDirectory(uploadsPath);
 app.UseStaticFiles();
 
 app.UseAuthentication();
+app.UseMiddleware<AuditLogMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

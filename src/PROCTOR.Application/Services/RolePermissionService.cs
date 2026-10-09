@@ -80,6 +80,7 @@ public class RolePermissionService : IRolePermissionService
                 existing.CanRead = permUpdate.CanRead;
                 existing.CanUpdate = permUpdate.CanUpdate;
                 existing.CanDelete = permUpdate.CanDelete;
+                existing.CanSend = permUpdate.CanSend;
                 existing.UpdatedAt = DateTime.UtcNow;
                 _menuPermissionRepository.Update(existing);
             }
@@ -93,7 +94,8 @@ public class RolePermissionService : IRolePermissionService
                     CanCreate = permUpdate.CanCreate,
                     CanRead = permUpdate.CanRead,
                     CanUpdate = permUpdate.CanUpdate,
-                    CanDelete = permUpdate.CanDelete
+                    CanDelete = permUpdate.CanDelete,
+                    CanSend = permUpdate.CanSend
                 };
                 await _menuPermissionRepository.AddAsync(newPermission);
             }

@@ -51,6 +51,7 @@ public class PermissionChecker : IPermissionChecker
             "read" => permission.CanRead,
             "update" => permission.CanUpdate,
             "delete" => permission.CanDelete,
+            "send" => permission.CanSend,
             _ => false
         };
     }

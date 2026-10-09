@@ -36,8 +36,8 @@ public class NotificationService : INotificationService
 
     public async Task<List<NotificationDto>> GetByUserAsync(Guid userId, string role)
     {
-        var notifications = await _notificationRepository.FindAsync(n =>
-            n.UserId == userId || n.Role == role);
+        var notifications = CollapseLegacyForwardDuplicates(
+            await _notificationRepository.FindAsync(n => n.UserId == userId || n.Role == role));
 
         return notifications
             .OrderByDescending(n => n.CreatedAt)
@@ -56,8 +56,9 @@ public class NotificationService : INotificationService
 
     public async Task<List<NotificationDto>> GetByCaseForUserAsync(Guid caseId, Guid userId, string role)
     {
-        var notifications = await _notificationRepository.FindAsync(n =>
-            n.CaseId == caseId && (n.UserId == userId || n.Role == role));
+        var notifications = CollapseLegacyForwardDuplicates(
+            await _notificationRepository.FindAsync(n =>
+                n.CaseId == caseId && (n.UserId == userId || n.Role == role)));
 
         return notifications
             .OrderByDescending(n => n.CreatedAt)
@@ -99,16 +100,20 @@ public class NotificationService : INotificationService
 
     public async Task<int> GetUnreadCountAsync(Guid userId, string role)
     {
-        var unread = await _notificationRepository.FindAsync(n =>
-            (n.UserId == userId || n.Role == role) && !n.IsRead);
+        // Include read rows before collapsing so a read role broadcast can still be paired
+        // with its legacy user-specific duplicate (and vice versa).
+        var visible = CollapseLegacyForwardDuplicates(
+            await _notificationRepository.FindAsync(n => n.UserId == userId || n.Role == role));
 
-        return unread.Count();
+        return visible.Count(n => !n.IsRead);
     }
 
     public async Task<NotificationCategoryCountsDto> GetUnreadCountsByCategoryAsync(Guid userId, string role)
     {
-        var unread = (await _notificationRepository.FindAsync(n =>
-            (n.UserId == userId || n.Role == role) && !n.IsRead)).ToList();
+        var unread = CollapseLegacyForwardDuplicates(
+                await _notificationRepository.FindAsync(n => n.UserId == userId || n.Role == role))
+            .Where(n => !n.IsRead)
+            .ToList();
 
         var result = new NotificationCategoryCountsDto { Total = unread.Count };
 
@@ -121,6 +126,12 @@ public class NotificationService : INotificationService
         foreach (var n in unread)
         {
             if (!n.CaseId.HasValue || !typeById.TryGetValue(n.CaseId.Value, out var t)) continue;
+            var caseEntity = cases.First(c => c.Id == n.CaseId.Value);
+            if (caseEntity.IsConfidential || t == CaseType.Confidential)
+            {
+                result.Confidential++;
+                continue;
+            }
             switch (t)
             {
                 case CaseType.Type1: result.Type1++; break;
@@ -130,5 +141,33 @@ public class NotificationService : INotificationService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Older forwarding code created a role-wide "Case Forwarded to You" row and a direct
+    /// "Case Assigned to You" row for the selected person. That person matches both rows.
+    /// Keep their user-specific row and suppress only the matching role row; other members
+    /// of the role do not receive the direct row, so their broadcast remains visible.
+    /// </summary>
+    private static List<Notification> CollapseLegacyForwardDuplicates(IEnumerable<Notification> source)
+    {
+        var notifications = source.ToList();
+        var directAssignments = notifications
+            .Where(n => n.UserId.HasValue
+                && n.CaseId.HasValue
+                && n.Title == "Case Assigned to You")
+            .ToList();
+
+        return notifications.Where(notification =>
+        {
+            if (notification.UserId.HasValue
+                || !notification.CaseId.HasValue
+                || notification.Title != "Case Forwarded to You")
+                return true;
+
+            return !directAssignments.Any(direct =>
+                direct.CaseId == notification.CaseId
+                && Math.Abs((direct.CreatedAt - notification.CreatedAt).TotalSeconds) <= 60);
+        }).ToList();
     }
 }

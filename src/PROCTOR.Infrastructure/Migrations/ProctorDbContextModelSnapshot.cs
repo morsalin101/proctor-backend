@@ -57,6 +57,92 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.ToTable("Articles");
                 });
 
+            modelBuilder.Entity("PROCTOR.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetailsJson")
+                        .HasColumnType("text");
+
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("QueryString")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("UserRole")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("EntityType");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("PROCTOR.Domain.Entities.Case", b =>
                 {
                     b.Property<Guid>("Id")
@@ -141,6 +227,9 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasColumnType("double precision");
 
                     b.Property<bool>("IsAcknowledged")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsConfidential")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Priority")
@@ -352,9 +441,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsConfidential")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -456,6 +542,131 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.ToTable("CaseVerifications");
                 });
 
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DcMemberRemark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MemberName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("MemberUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowId", "MemberUserId")
+                        .IsUnique();
+
+                    b.ToTable("DcMemberRemarks");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DisciplinaryResolution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApprovedByName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ForwardRemarks")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResolutionNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResolutionNumber")
+                        .IsUnique();
+
+                    b.ToTable("DisciplinaryResolutions");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DisciplinaryResolutionCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ResolutionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SecretaryRemarks")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShortDescription")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CaseId")
+                        .IsUnique();
+
+                    b.HasIndex("ResolutionId");
+
+                    b.ToTable("DisciplinaryResolutionCases");
+                });
+
             modelBuilder.Entity("PROCTOR.Domain.Entities.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -504,6 +715,10 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AppliesToType")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -601,6 +816,59 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.ToTable("Hearings");
                 });
 
+            modelBuilder.Entity("PROCTOR.Domain.Entities.InvestigationAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalUrl")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StorageName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UploadedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UploadedByName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UploadedByRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CaseId");
+
+                    b.ToTable("InvestigationAttachments");
+                });
+
             modelBuilder.Entity("PROCTOR.Domain.Entities.MenuPermission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -614,6 +882,9 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("CanRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CanSend")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("CanUpdate")
@@ -900,6 +1171,11 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<string>("AdvisorName")
                         .HasColumnType("text");
 
+                    b.Property<string>("Batch")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<decimal?>("Cgpa")
                         .HasPrecision(3, 2)
                         .HasColumnType("numeric(3,2)");
@@ -948,6 +1224,8 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Batch");
 
                     b.HasIndex("StudentId")
                         .IsUnique();
@@ -1026,6 +1304,102 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.HasIndex("CaseId");
 
                     b.ToTable("TimelineEvents");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.Type3Workflow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrentStage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("StartedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StartedByName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CaseId")
+                        .IsUnique();
+
+                    b.HasIndex("ReportId")
+                        .IsUnique();
+
+                    b.ToTable("Type3Workflows");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.Type3WorkflowTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromStage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Remarks")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TargetRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToStage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowId", "FromStage", "ToStage")
+                        .IsUnique();
+
+                    b.ToTable("Type3WorkflowTransitions");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.User", b =>
@@ -1189,6 +1563,36 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Navigation("Case");
                 });
 
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DcMemberRemark", b =>
+                {
+                    b.HasOne("PROCTOR.Domain.Entities.Type3Workflow", "Workflow")
+                        .WithMany("MemberRemarks")
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Workflow");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DisciplinaryResolutionCase", b =>
+                {
+                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PROCTOR.Domain.Entities.DisciplinaryResolution", "Resolution")
+                        .WithMany("Cases")
+                        .HasForeignKey("ResolutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Case");
+
+                    b.Navigation("Resolution");
+                });
+
             modelBuilder.Entity("PROCTOR.Domain.Entities.Document", b =>
                 {
                     b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
@@ -1204,6 +1608,17 @@ namespace PROCTOR.Infrastructure.Migrations
                 {
                     b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
                         .WithMany("Hearings")
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Case");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.InvestigationAttachment", b =>
+                {
+                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
+                        .WithMany("InvestigationAttachments")
                         .HasForeignKey("CaseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1283,6 +1698,36 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Navigation("Case");
                 });
 
+            modelBuilder.Entity("PROCTOR.Domain.Entities.Type3Workflow", b =>
+                {
+                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
+                        .WithOne("Type3Workflow")
+                        .HasForeignKey("PROCTOR.Domain.Entities.Type3Workflow", "CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PROCTOR.Domain.Entities.Report", "Report")
+                        .WithMany()
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Case");
+
+                    b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.Type3WorkflowTransition", b =>
+                {
+                    b.HasOne("PROCTOR.Domain.Entities.Type3Workflow", "Workflow")
+                        .WithMany("Transitions")
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Workflow");
+                });
+
             modelBuilder.Entity("PROCTOR.Domain.Entities.Case", b =>
                 {
                     b.Navigation("AccusedPersons");
@@ -1297,18 +1742,34 @@ namespace PROCTOR.Infrastructure.Migrations
 
                     b.Navigation("Hearings");
 
+                    b.Navigation("InvestigationAttachments");
+
                     b.Navigation("Notes");
 
                     b.Navigation("Reports");
 
                     b.Navigation("TimelineEvents");
 
+                    b.Navigation("Type3Workflow");
+
                     b.Navigation("Verifications");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.DisciplinaryResolution", b =>
+                {
+                    b.Navigation("Cases");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.Role", b =>
                 {
                     b.Navigation("MenuPermissions");
+                });
+
+            modelBuilder.Entity("PROCTOR.Domain.Entities.Type3Workflow", b =>
+                {
+                    b.Navigation("MemberRemarks");
+
+                    b.Navigation("Transitions");
                 });
 
             modelBuilder.Entity("PROCTOR.Domain.Entities.User", b =>

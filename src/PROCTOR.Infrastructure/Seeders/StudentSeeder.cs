@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using PROCTOR.Domain.Entities;
 using PROCTOR.Domain.Enums;
 using PROCTOR.Infrastructure.Data;
+using System.Text.RegularExpressions;
 
 namespace PROCTOR.Infrastructure.Seeders;
 
@@ -36,6 +38,12 @@ public static class StudentSeeder
                     record.UpdatedAt = DateTime.UtcNow;
                     changed = true;
                 }
+                if (string.IsNullOrWhiteSpace(record.Batch))
+                {
+                    record.Batch = BuildBatch(record.Department ?? dept, studentId);
+                    record.UpdatedAt = DateTime.UtcNow;
+                    changed = true;
+                }
                 continue;
             }
             var student = new Student
@@ -44,6 +52,7 @@ public static class StudentSeeder
                 StudentId = studentId,
                 Name = name,
                 Department = dept,
+                Batch = BuildBatch(dept, studentId),
                 Contact = contact,
                 Email = $"{studentId}@university.edu",
                 Gender = gender,
@@ -85,6 +94,12 @@ public static class StudentSeeder
                     linkedRecord.UpdatedAt = DateTime.UtcNow;
                     changed = true;
                 }
+                if (string.IsNullOrWhiteSpace(linkedRecord.Batch))
+                {
+                    linkedRecord.Batch = BuildBatch(linkedRecord.Department ?? dept, linkedRecord.StudentId);
+                    linkedRecord.UpdatedAt = DateTime.UtcNow;
+                    changed = true;
+                }
                 continue;
             }
 
@@ -102,6 +117,7 @@ public static class StudentSeeder
                 Name = name,
                 Email = email,
                 Department = dept,
+                Batch = BuildBatch(dept, id),
                 Gender = gender,
                 Cgpa = cgpa,
                 IsActive = true,
@@ -115,5 +131,41 @@ public static class StudentSeeder
         }
 
         if (changed) await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Repairs older cases created before the student CGPA snapshot was consistently saved.
+    /// The student directory remains the source of truth for a missing snapshot only; an
+    /// existing case value is never overwritten.
+    /// </summary>
+    public static async Task BackfillCaseCgpaAsync(ProctorDbContext context)
+    {
+        var studentCgpas = context.Students
+            .Where(student => student.Cgpa != null)
+            .GroupBy(student => student.StudentId)
+            .ToDictionary(group => group.Key, group => group.First().Cgpa);
+        if (studentCgpas.Count == 0) return;
+
+        var cases = await context.Cases.Where(caseItem => caseItem.StudentCgpa == null).ToListAsync();
+        var changed = false;
+        foreach (var caseItem in cases)
+        {
+            if (!studentCgpas.TryGetValue(caseItem.StudentId, out var cgpa) || cgpa is null) continue;
+            caseItem.StudentCgpa = cgpa;
+            caseItem.UpdatedAt = DateTime.UtcNow;
+            changed = true;
+        }
+
+        if (changed) await context.SaveChangesAsync();
+    }
+
+    private static string BuildBatch(string department, string studentId)
+    {
+        var departmentCode = Regex.Replace(department.ToUpperInvariant(), @"[^A-Z0-9]+", string.Empty);
+        if (string.IsNullOrWhiteSpace(departmentCode)) departmentCode = "UNKNOWN";
+        departmentCode = departmentCode[..Math.Min(departmentCode.Length, 60)];
+        var digits = Regex.Replace(studentId, @"\D", string.Empty);
+        var batchNumber = digits.Length >= 3 ? digits[..3] : digits.PadLeft(3, '0');
+        return $"{departmentCode}_{batchNumber}";
     }
 }

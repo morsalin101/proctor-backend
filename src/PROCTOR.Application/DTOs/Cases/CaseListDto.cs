@@ -9,6 +9,9 @@ public class CaseListDto
     public string StudentName { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+    public bool IsConfidential { get; set; }
+    public string? Type3Stage { get; set; }
+    public string? WorkflowStatusLabel { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public string? AssignedTo { get; set; }
@@ -20,7 +23,6 @@ public class CaseListDto
     public string? Verdict { get; set; }
 
     public string? CategoryName { get; set; }
-    public bool CategoryIsConfidential { get; set; }
     public bool IsAcknowledged { get; set; }
 
     public string? IncidentLocationDescription { get; set; }

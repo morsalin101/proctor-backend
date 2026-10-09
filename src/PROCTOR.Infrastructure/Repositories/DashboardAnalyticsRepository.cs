@@ -20,15 +20,18 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
         if (role == "student")
             source = source.Where(c => userId.HasValue && c.SubmittedByUserId == userId.Value);
         else if (role == "female-coordinator")
-            source = source.Where(c => c.Type == CaseType.Confidential || c.Type == CaseType.Type1 || c.SubmitterGender == Gender.Female);
+            source = source.Where(c => c.IsConfidential || c.Type == CaseType.Confidential || c.Type == CaseType.Type1 || c.SubmitterGender == Gender.Female);
         else if (role != "proctor" && role != "coordinator" && role != "super-admin" && role != "vc")
             source = source.Where(c =>
                 (c.ForwardedToRole == role || (userId.HasValue &&
                     (c.AssignedToId == userId.Value || c.Assignments.Any(a => a.IsActive && a.UserId == userId.Value))))
-                && (c.Type != CaseType.Confidential || role == "sexual-harassment-committee"));
+                && ((!c.IsConfidential && c.Type != CaseType.Confidential) || role == "sexual-harassment-committee"));
 
         var departments = await source.Where(c => c.StudentDepartment != null && c.StudentDepartment != "")
             .Select(c => c.StudentDepartment!).Distinct().OrderBy(x => x).ToListAsync();
+        var batches = await _db.Students.AsNoTracking()
+            .Where(s => s.Batch != "" && source.Any(c => c.StudentId == s.StudentId))
+            .Select(s => s.Batch).Distinct().OrderBy(x => x).ToListAsync();
         var people = await _db.Users.AsNoTracking().Where(u => u.IsActive && u.Role != UserRole.Student && u.Role != UserRole.External)
             .Select(u => new { u.Id, u.Name, u.Role }).OrderBy(u => u.Name).ToListAsync();
 
@@ -39,6 +42,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             query = query.Where(c => EF.Functions.ILike(c.CaseNumber, $"%{term}%")
                 || EF.Functions.ILike(c.StudentName, $"%{term}%")
                 || EF.Functions.ILike(c.StudentId, $"%{term}%")
+                || _db.Students.Any(s => s.StudentId == c.StudentId && EF.Functions.ILike(s.Batch, $"%{term}%"))
                 || EF.Functions.ILike(c.Description, $"%{term}%")
                 || (c.AccusedName != null && EF.Functions.ILike(c.AccusedName, $"%{term}%"))
                 || c.AccusedPersons.Any(a => EF.Functions.ILike(a.Name, $"%{term}%") || EF.Functions.ILike(a.AccusedStudentId, $"%{term}%")));
@@ -46,9 +50,13 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
         if (!string.IsNullOrWhiteSpace(filter.Status) && TryEnum<CaseStatus>(filter.Status, out var status))
             query = query.Where(c => c.Status == status);
         if (!string.IsNullOrWhiteSpace(filter.Type) && TryEnum<CaseType>(filter.Type, out var type))
-            query = query.Where(c => c.Type == type);
+            query = type == CaseType.Confidential
+                ? query.Where(c => c.IsConfidential || c.Type == CaseType.Confidential)
+                : query.Where(c => c.Type == type);
         if (!string.IsNullOrWhiteSpace(filter.Department))
             query = query.Where(c => c.StudentDepartment == filter.Department);
+        if (!string.IsNullOrWhiteSpace(filter.Batch))
+            query = query.Where(c => _db.Students.Any(s => s.StudentId == c.StudentId && s.Batch == filter.Batch));
         // filter.SubjectId removed
         if (filter.CategoryId.HasValue)
             query = query.Where(c => c.CategoryId == filter.CategoryId.Value);
@@ -57,9 +65,15 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
         if (!string.IsNullOrWhiteSpace(filter.Semester))
             query = query.Where(c => c.AcademicSemester == filter.Semester);
         if (filter.MinCgpa.HasValue)
-            query = query.Where(c => c.StudentCgpa >= filter.MinCgpa.Value);
+            query = query.Where(c => (c.StudentCgpa ?? _db.Students
+                .Where(s => s.StudentId == c.StudentId)
+                .Select(s => s.Cgpa)
+                .FirstOrDefault()) >= filter.MinCgpa.Value);
         if (filter.MaxCgpa.HasValue)
-            query = query.Where(c => c.StudentCgpa <= filter.MaxCgpa.Value);
+            query = query.Where(c => (c.StudentCgpa ?? _db.Students
+                .Where(s => s.StudentId == c.StudentId)
+                .Select(s => s.Cgpa)
+                .FirstOrDefault()) <= filter.MaxCgpa.Value);
         if (filter.From.HasValue)
         {
             var start = DateTime.SpecifyKind(filter.From.Value.Date, DateTimeKind.Utc);
@@ -96,9 +110,22 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             .Select(g => new { Name = g.Key, Count = g.Count() }).OrderByDescending(g => g.Count).ToListAsync();
         var roleRows = await query.GroupBy(c => c.ForwardedToRole)
             .Select(g => new { Role = g.Key, Count = g.Count() }).ToListAsync();
-        var cgpaRows = await query.GroupBy(c => c.StudentCgpa == null ? 0 :
-            c.StudentCgpa < 2 ? 1 : c.StudentCgpa < 3 ? 2 : c.StudentCgpa < 3.5m ? 3 : 4)
-            .Select(g => new { Bucket = g.Key, Count = g.Count() }).ToListAsync();
+        // Older and Type-1 cases may not carry their own CGPA snapshot. Use the student
+        // directory value when available and omit genuinely unavailable values rather than
+        // presenting an unexplained "Unknown" CGPA range.
+        var cgpaRows = await query
+            .Select(c => new
+            {
+                Cgpa = c.StudentCgpa ?? _db.Students
+                    .Where(s => s.StudentId == c.StudentId)
+                    .Select(s => s.Cgpa)
+                    .FirstOrDefault()
+            })
+            .Where(x => x.Cgpa != null)
+            .GroupBy(x => x.Cgpa < 2 ? 1 : x.Cgpa < 3 ? 2 : x.Cgpa < 3.5m ? 3 : 4)
+            .Select(g => new { Bucket = g.Key, Count = g.Count() })
+            .OrderBy(g => g.Bucket)
+            .ToListAsync();
 
         // A case with several assignees contributes once to each person's workload.
         var activeAssignments = _db.CaseAssignments.AsNoTracking()
@@ -115,8 +142,11 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
         var cases = await query.OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(c => new { c.Id, c.CaseNumber, c.StudentName, c.StudentId, c.StudentDepartment,
+                Batch = _db.Students.Where(s => s.StudentId == c.StudentId).Select(s => s.Batch).FirstOrDefault(),
                 CategoryName = c.Category != null ? c.Category.Name : null,
-                c.AcademicSemester, c.StudentSemester, c.StudentCgpa, c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt,
+                c.AcademicSemester, c.StudentSemester,
+                StudentCgpa = c.StudentCgpa ?? _db.Students.Where(s => s.StudentId == c.StudentId).Select(s => s.Cgpa).FirstOrDefault(),
+                c.Status, c.Type, AssignedTo = c.AssignedTo != null ? c.AssignedTo.Name : null, c.CreatedAt,
                 AccusedName = c.AccusedPersons.FirstOrDefault() != null ? c.AccusedPersons.FirstOrDefault()!.Name : c.AccusedName,
                 ComplainantName = c.Complainants.FirstOrDefault() != null ? c.Complainants.FirstOrDefault()!.Name : c.StudentName,
                 Punishment = c.Verdict,
@@ -142,13 +172,14 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             CaseTypes = typeRows.Select(x => new DashboardGroupDto(x.Type.ToKebabCase(), x.Count)).ToList(),
             Categories = categoryRows.Select(x => new DashboardGroupDto(x.Name ?? "Uncategorized", x.Count)).ToList(),
             CgpaRanges = cgpaRows.Select(x => new DashboardGroupDto(x.Bucket switch
-                { 1 => "Below 2.00", 2 => "2.00–2.99", 3 => "3.00–3.49", 4 => "3.50–4.00", _ => "Unknown" }, x.Count)).ToList(),
+                { 1 => "Below 2.00", 2 => "2.00–2.99", 3 => "3.00–3.49", _ => "3.50–4.00" }, x.Count)).ToList(),
             Workload = workloadRows.Select(x => new DashboardGroupDto(people.FirstOrDefault(p => p.Id == x.UserId)?.Name ?? "Unknown", x.Count)).ToList(),
             RoleWorkload = roleRows.Select(x => new DashboardGroupDto(x.Role ?? "Unrouted", x.Count)).ToList(),
             Departments = departments,
+            Batches = batches,
             People = people.Select(p => new DashboardPersonDto(p.Id, p.Name, p.Role.ToKebabCase())).ToList(),
             Cases = cases.Select(c => new DashboardCaseDto(c.Id, c.CaseNumber, c.StudentName, c.StudentId,
-                c.StudentDepartment, c.CategoryName, c.StudentSemester, c.StudentCgpa, c.Status.ToKebabCase(), c.Type.ToKebabCase(), c.AssignedTo, c.CreatedAt, c.AccusedName, c.ComplainantName, c.Punishment, c.Collaborators)).ToList(),
+                c.StudentDepartment, c.Batch, c.CategoryName, c.StudentSemester, c.StudentCgpa, c.Status.ToKebabCase(), c.Type.ToKebabCase(), c.AssignedTo, c.CreatedAt, c.AccusedName, c.ComplainantName, c.Punishment, c.Collaborators)).ToList(),
             Activity = activity.Select(e => new DashboardActivityDto(e.CaseId, e.CaseNumber, e.Action, e.User, e.CreatedAt)).ToList(),
             Page = page,
             PageSize = pageSize

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.DTOs.Students;
 using PROCTOR.Application.Mapping;
@@ -31,6 +32,7 @@ public class StudentsController : ControllerBase
         StudentId = s.StudentId,
         Name = s.Name,
         Department = s.Department,
+        Batch = s.Batch,
         Contact = s.Contact,
         Email = s.Email,
         Gender = s.Gender.ToKebabCase(),
@@ -101,6 +103,7 @@ public class StudentsController : ControllerBase
             StudentId = sid,
             Name = request.Name.Trim(),
             Department = request.Department,
+            Batch = FormatBatch(request.Batch, request.Department, sid),
             Contact = request.Contact,
             Email = request.Email,
             Gender = string.IsNullOrWhiteSpace(request.Gender) ? Gender.Unspecified : MappingExtensions.ParseEnum<Gender>(request.Gender),
@@ -114,5 +117,21 @@ public class StudentsController : ControllerBase
         await _students.AddAsync(student);
         await _unitOfWork.SaveChangesAsync();
         return Ok(ApiResponse<StudentDto>.SuccessResponse(ToDto(student), "Student added."));
+    }
+
+    private static string FormatBatch(string? batch, string? department, string studentId)
+    {
+        if (!string.IsNullOrWhiteSpace(batch))
+        {
+            var normalized = Regex.Replace(batch.Trim().ToUpperInvariant(), @"[^A-Z0-9]+", "_").Trim('_');
+            if (!string.IsNullOrWhiteSpace(normalized)) return normalized[..Math.Min(normalized.Length, 64)];
+        }
+
+        var departmentCode = Regex.Replace((department ?? string.Empty).ToUpperInvariant(), @"[^A-Z0-9]+", string.Empty);
+        if (string.IsNullOrWhiteSpace(departmentCode)) departmentCode = "UNKNOWN";
+        departmentCode = departmentCode[..Math.Min(departmentCode.Length, 60)];
+        var digits = Regex.Replace(studentId, @"\D", string.Empty);
+        var batchNumber = digits.Length >= 3 ? digits[..3] : digits.PadLeft(3, '0');
+        return $"{departmentCode}_{batchNumber}";
     }
 }

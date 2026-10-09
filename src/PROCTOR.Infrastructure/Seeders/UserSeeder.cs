@@ -64,6 +64,15 @@ public static class UserSeeder
 
             // Leadership
             ("vc@university.edu", "Vice Chancellor", UserRole.VC, Gender.Male, "Password123!"),
+            ("dc.chairman@university.edu", "Prof. Rahman DC Chairman", UserRole.DCChairman, Gender.Male, "Password123!"),
+            ("dc.member1@university.edu", "DC Member One", UserRole.DCMember, Gender.Male, "Password123!"),
+            ("dc.member2@university.edu", "DC Member Two", UserRole.DCMember, Gender.Female, "Password123!"),
+            ("dc.member3@university.edu", "DC Member Three", UserRole.DCMember, Gender.Male, "Password123!"),
+            ("dc.member4@university.edu", "DC Member Four", UserRole.DCMember, Gender.Female, "Password123!"),
+            ("dc.member5@university.edu", "DC Member Five", UserRole.DCMember, Gender.Male, "Password123!"),
+            ("dc.member6@university.edu", "DC Member Six", UserRole.DCMember, Gender.Female, "Password123!"),
+            ("dc.secretary@university.edu", "DC Secretary", UserRole.DCSecretary, Gender.Male, "Password123!"),
+            ("chairman@university.edu", "Chairman", UserRole.Chairman, Gender.Male, "Password123!"),
             ("admin@university.edu", "System Administrator", UserRole.SuperAdmin, Gender.Unspecified, "Admin@123!")
         };
 

@@ -8,7 +8,7 @@ public static class ForwardingRuleSeeder
 {
     public static async Task SeedAsync(ProctorDbContext context)
     {
-        if (await context.ForwardingRules.AnyAsync()) return;
+        if (await context.ForwardingRules.AnyAsync(r => r.AppliesToType == "type-2")) return;
 
         var rules = new List<ForwardingRule>
         {
@@ -113,7 +113,7 @@ public static class ForwardingRuleSeeder
     // Seed __close__ and __hearing__ special rules (runs even if forwarding rules exist)
     public static async Task SeedSpecialRulesAsync(ProctorDbContext context)
     {
-        var hasClose = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__close__");
+        var hasClose = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__close__" && r.AppliesToType == "type-2");
         if (!hasClose)
         {
             var closeRules = new List<ForwardingRule>
@@ -127,7 +127,7 @@ public static class ForwardingRuleSeeder
             await context.ForwardingRules.AddRangeAsync(closeRules);
         }
 
-        var hasHearing = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__hearing__");
+        var hasHearing = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__hearing__" && r.AppliesToType == "type-2");
         if (!hasHearing)
         {
             var hearingRules = new List<ForwardingRule>
@@ -141,7 +141,7 @@ public static class ForwardingRuleSeeder
             await context.ForwardingRules.AddRangeAsync(hearingRules);
         }
 
-        var hasAssign = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__assign__");
+        var hasAssign = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__assign__" && r.AppliesToType == "type-2");
         if (!hasAssign)
         {
             var assignRules = AssignerRoles.Select(fromRole => new ForwardingRule
@@ -165,7 +165,7 @@ public static class ForwardingRuleSeeder
         foreach (var (toRole, resultStatus) in administrativeOfficerRules)
         {
             var exists = await context.ForwardingRules
-                .AnyAsync(r => r.FromRole == "coordinator" && r.ToRole == toRole);
+                .AnyAsync(r => r.FromRole == "coordinator" && r.ToRole == toRole && r.AppliesToType == "type-2");
             if (exists) continue;
 
             await context.ForwardingRules.AddAsync(new ForwardingRule
@@ -187,7 +187,7 @@ public static class ForwardingRuleSeeder
         foreach (var fromRole in draftReportRoles)
         {
             var exists = await context.ForwardingRules
-                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__draft_report__");
+                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__draft_report__" && r.AppliesToType == "type-2");
             if (exists) continue;
 
             await context.ForwardingRules.AddAsync(new ForwardingRule

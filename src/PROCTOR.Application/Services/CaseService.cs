@@ -56,9 +56,8 @@ public class CaseService : ICaseService
         return ApiResponse<PagedResult<CaseListDto>>.SuccessResponse(result);
     }
 
-    // A case is on the "female track" (handled only by the Female Coordinator) when the
-    // complainant is female or the case is confidential.
-    public static bool IsFemaleTrack(Case c) => c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female;
+    // The female officer's visibility scope includes female complaints and restricted cases.
+    public static bool IsFemaleTrack(Case c) => c.IsConfidential || c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female;
 
     // The Administrative Officer ("coordinator") is the Proctor's deputy and carries the same
     // power, so they see every case — the Proctor is rarely free and the office runs through
@@ -114,20 +113,21 @@ public class CaseService : ICaseService
             return ApiResponse<CaseDto>.FailResponse("Semester must be 1–12 and CGPA must be 0–4.");
         var caseNumber = await _unitOfWork.Cases.GenerateCaseNumberAsync();
 
-        // Resolve category and its confidentiality
+        // Categories describe the complaint only. They never determine confidentiality;
+        // that decision belongs to the receiving Assistant Administrative Officer.
         Guid? categoryId = null;
-        CaseCategory? category = null;
         if (!string.IsNullOrWhiteSpace(request.CategoryId) && Guid.TryParse(request.CategoryId, out var catGuid))
         {
-            category = await _categoryRepo.GetByIdAsync(catGuid);
+            var category = await _categoryRepo.GetByIdAsync(catGuid);
             if (category is not null)
                 categoryId = category.Id;
         }
 
         var caseType = MappingExtensions.ParseEnum<CaseType>(request.Type);
-        // If admin-marked category is confidential, force the case type to Confidential
-        if (category?.IsConfidential == true)
-            caseType = CaseType.Confidential;
+        // A submitter cannot choose the confidential track. New formal complaints always
+        // enter as Type-2 and may be marked confidential later by the receiving officer.
+        if (caseType == CaseType.Confidential)
+            caseType = CaseType.Type2;
 
         var newCase = new Case
         {
@@ -204,18 +204,13 @@ public class CaseService : ICaseService
             }
         }
 
-        // Gender-based coordinator routing for non-Type-1 cases: the complainant's gender
-        // (chosen on the Type-2 form) decides which coordinator handles the case —
-        // female → female coordinator, male → (male) coordinator. Confidential always goes
-        // to a female coordinator. If no gender is supplied, fall back to the submitter's
-        // account gender so existing flows keep working.
-        User? routedCoordinator = null;
+        // Gender-based intake routing for non-Type-1 cases: female complainants go to the
+        // female Assistant Administrative Officer; male complainants go to the male officer.
+        // If no gender is supplied, fall back to the submitter's account gender.
         string? routedRole = null;
         if (newCase.Type != CaseType.Type1)
         {
             var selectedGender = request.Gender?.Trim().ToLowerInvariant();
-            if (newCase.Type == CaseType.Confidential)
-                selectedGender = "female";
             if (string.IsNullOrEmpty(selectedGender) && submittedByUserId.HasValue)
             {
                 var submitter = await _unitOfWork.Users.GetByIdAsync(submittedByUserId.Value);
@@ -223,45 +218,26 @@ public class CaseService : ICaseService
                 else if (submitter?.Gender == Gender.Male) selectedGender = "male";
             }
 
+            if (selectedGender == "female") newCase.SubmitterGender = Gender.Female;
+            else if (selectedGender == "male") newCase.SubmitterGender = Gender.Male;
+
             if (selectedGender == "female")
             {
-                var fcs = await _unitOfWork.Users.FindAsync(u => u.Role == UserRole.FemaleCoordinator && u.IsActive);
-                routedCoordinator = fcs.FirstOrDefault();
                 routedRole = "female-coordinator";
             }
             else if (selectedGender == "male")
             {
-                var cs = (await _unitOfWork.Users.FindAsync(u => u.Role == UserRole.Coordinator && u.IsActive)).ToList();
-                routedCoordinator = cs.FirstOrDefault(u => u.Gender == Gender.Male) ?? cs.FirstOrDefault();
                 routedRole = "coordinator";
             }
-        }
 
-        if (routedCoordinator is not null)
-        {
-            newCase.AssignedToId = routedCoordinator.Id;
+            routedRole ??= newCase.SubmitterGender == Gender.Female
+                ? "female-coordinator"
+                : "coordinator";
             newCase.ForwardedToRole = routedRole;
-            newCase.Assignments.Add(new CaseAssignment
-            {
-                Id = Guid.NewGuid(),
-                CaseId = newCase.Id,
-                UserId = routedCoordinator.Id,
-                AssignedById = submittedByUserId,
-                AssignedAt = DateTime.UtcNow,
-                IsActive = true,
-                IsPrimary = false
-            });
         }
 
         await _unitOfWork.Cases.AddAsync(newCase);
         await _unitOfWork.SaveChangesAsync();
-
-        // Notifications
-        if (routedCoordinator is not null)
-        {
-            await _notificationService.CreateAsync(routedCoordinator.Id, null, "New Case Auto-Routed",
-                $"Case {caseNumber} was auto-assigned to you.", newCase.Id);
-        }
 
         // Proctor always gets a heads-up on every submission — they oversee the
         // whole process even when the case is routed elsewhere, so they need the
@@ -311,8 +287,10 @@ public class CaseService : ICaseService
         }
         else
         {
-            // Notify the role queue too, so coordinators who aren't the specific assignee still see it.
-            var targetRole = routedRole ?? (newCase.Type == CaseType.Confidential ? "female-coordinator" : "coordinator");
+            // Intake is a role queue, not a personal assignment. Every officer in the
+            // matching queue can see the notification; "Handled By" remains empty until an
+            // authorized user explicitly assigns the first responsible person.
+            var targetRole = routedRole ?? (newCase.SubmitterGender == Gender.Female ? "female-coordinator" : "coordinator");
             await _notificationService.CreateAsync(null, targetRole, "New Case Submitted",
                 $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
         }
@@ -527,8 +505,15 @@ public class CaseService : ICaseService
         }
 
         Guid? primaryGuid = null;
-        if (!string.IsNullOrWhiteSpace(request.PrimaryUserId) && Guid.TryParse(request.PrimaryUserId, out var pg))
+        var hasExistingHandler = c.Assignments.Any(a => a.IsActive
+            && a.User is not null && AssignableHandlerRoles.Contains(a.User.Role));
+        if (!hasExistingHandler)
+            primaryGuid = userGuids[0];
+        else if (!string.IsNullOrWhiteSpace(request.PrimaryUserId)
+            && Guid.TryParse(request.PrimaryUserId, out var pg) && userGuids.Contains(pg))
             primaryGuid = pg;
+        else
+            primaryGuid = userGuids[0];
 
         // Deactivate handlers dropped from the new list. Assignments held by anyone outside
         // the handler roles are left alone — a Type-2 case auto-routed to an Administrative
@@ -648,16 +633,30 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Assignments updated.");
     }
 
-    public async Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy, string userRole)
+    public async Task<ApiResponse<CaseDto>> UpdateCaseStatusAsync(Guid id, UpdateCaseStatusRequest request, string updatedBy, string userRole, Guid actingUserId)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
+        if (c.Type == CaseType.Type3)
+            return ApiResponse<CaseDto>.FailResponse("Type-3 status is controlled by the disciplinary workflow queue.");
 
         var oldStatus = c.Status;
         var newStatus = MappingExtensions.ParseEnum<CaseStatus>(request.Status);
 
-        if (!await _workflowService.ValidateTransitionAsync(oldStatus, newStatus, userRole))
+        var transitionAllowed = await _workflowService.ValidateTransitionAsync(oldStatus, newStatus, userRole, c.Type);
+
+        // For Type-1 incidents, responsibility can also be earned through the incident itself:
+        // the person who acknowledged it may close it, and an assigned handler may close it
+        // once somebody has acknowledged it. This supplements (but does not leak into) the
+        // role-based Type-1 Close setting.
+        var contextualType1Close = c.Type == CaseType.Type1
+            && newStatus == CaseStatus.Closed
+            && actingUserId != Guid.Empty
+            && ((c.IsAcknowledged && c.AcknowledgedById == actingUserId)
+                || (c.IsAcknowledged && c.Assignments.Any(a => a.IsActive && a.UserId == actingUserId)));
+
+        if (!transitionAllowed && !contextualType1Close)
             return ApiResponse<CaseDto>.FailResponse($"Transition from '{oldStatus.ToKebabCase()}' to '{newStatus.ToKebabCase()}' is not allowed for role '{userRole}'.");
 
         // A case may only be closed with a stated reason — it is the record of why the
@@ -719,7 +718,7 @@ public class CaseService : ICaseService
         }
         else if (newStatus == CaseStatus.Submitted)
         {
-            var targetRole = c.Type == CaseType.Confidential ? "female-coordinator" : "coordinator";
+            var targetRole = c.SubmitterGender == Gender.Female ? "female-coordinator" : "coordinator";
             await _notificationService.CreateAsync(null, targetRole,
                 "Case Resubmitted", $"Case {c.CaseNumber} has been resubmitted by {c.StudentName}.", c.Id);
         }
@@ -757,17 +756,33 @@ public class CaseService : ICaseService
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
 
+        if (c.Type == CaseType.Type3)
+            return ApiResponse<CaseDto>.FailResponse("Use the Type-3 report queue to forward this case.");
+
+        if (request.MarkAsConfidential)
+        {
+            if (userRole != "female-coordinator")
+                return ApiResponse<CaseDto>.FailResponse("Only the female Assistant Administrative Officer can mark a case as confidential.");
+            if (c.SubmitterGender != Gender.Female)
+                return ApiResponse<CaseDto>.FailResponse("Only a female-submitted case can be marked confidential in this workflow.");
+            if (c.Type == CaseType.Type1)
+                return ApiResponse<CaseDto>.FailResponse("Type-1 incidents cannot be marked confidential during forwarding.");
+        }
+
         // An open hearing must be closed out before the case moves on: the next role acts
         // on the hearing's outcome (its remarks), so forwarding first would hand them an
         // undecided case. The client also disables the Forward button in this state.
         if (c.Hearings.Any(h => h.Status == HearingStatus.Scheduled))
             return ApiResponse<CaseDto>.FailResponse("This case has a hearing that is still open. Close the hearing before forwarding the case.");
 
-        var newStatus = await _workflowService.GetForwardStatusAsync(userRole, request.TargetRole, c.Status);
+        var newStatus = await _workflowService.GetForwardStatusAsync(userRole, request.TargetRole, c.Status, c.Type);
         if (newStatus is null)
             return ApiResponse<CaseDto>.FailResponse($"Cannot forward case from role '{userRole}' to '{request.TargetRole}'.");
 
         var oldStatus = c.Status;
+        var newlyMarkedConfidential = request.MarkAsConfidential && !c.IsConfidential && c.Type != CaseType.Confidential;
+        if (newlyMarkedConfidential)
+            c.IsConfidential = true;
         c.Status = newStatus.Value;
         c.ForwardedToRole = request.TargetRole;
 
@@ -806,6 +821,18 @@ public class CaseService : ICaseService
 
         _unitOfWork.Cases.Update(c);
 
+        if (newlyMarkedConfidential)
+        {
+            _unitOfWork.Add(new TimelineEvent
+            {
+                Id = Guid.NewGuid(),
+                CaseId = c.Id,
+                Action = "Marked Confidential",
+                Description = $"Case marked confidential by {updatedBy} before forwarding.",
+                User = updatedBy
+            });
+        }
+
         _unitOfWork.Add(new TimelineEvent
         {
             Id = Guid.NewGuid(),
@@ -828,7 +855,8 @@ public class CaseService : ICaseService
 
         await _unitOfWork.SaveChangesAsync();
 
-        if (request.TargetRole == "disciplinary-committee")
+        if (request.TargetRole == "disciplinary-committee"
+            && c.Type is CaseType.Type2 or CaseType.Confidential)
         {
             _unitOfWork.Add(new Report
             {
@@ -841,19 +869,29 @@ public class CaseService : ICaseService
             await _unitOfWork.SaveChangesAsync();
         }
 
-        await _notificationService.CreateAsync(null, request.TargetRole,
-            "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);
+        // A person selected in the forwarding UI is both the target-role member and the
+        // direct assignee. Sending both a role notification and a user notification creates
+        // duplicate alerts for that person, because notifications are queried by user OR role.
+        // Prefer one direct notification; keep the role broadcast only for role-only forwards.
+        var directRecipientId = Guid.TryParse(request.AssignedToUserId, out var parsedNotifyUserId)
+            ? parsedNotifyUserId
+            : (Guid?)null;
+
+        if (directRecipientId.HasValue)
+        {
+            await _notificationService.CreateAsync(directRecipientId.Value, null,
+                "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);
+        }
+        else
+        {
+            await _notificationService.CreateAsync(null, request.TargetRole,
+                "Case Forwarded to You", $"Case {c.CaseNumber} has been forwarded to your attention by {updatedBy}.", c.Id);
+        }
 
         if (request.TargetRole == "proctor")
         {
             await _notificationService.CreateAsync(null, "coordinator",
                 "Case Forwarded to Proctor", $"Case {c.CaseNumber} has been forwarded to the Proctor by {updatedBy}.", c.Id);
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var notifyUserId))
-        {
-            await _notificationService.CreateAsync(notifyUserId, null,
-                "Case Assigned to You", $"Case {c.CaseNumber} has been specifically assigned to you.", c.Id);
         }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
@@ -866,6 +904,13 @@ public class CaseService : ICaseService
         if (c is null)
             return ApiResponse<ReportDto>.FailResponse("Case not found.");
 
+        // Investigation reports belong to the Type-2 workflow. Confidential is retained
+        // here only for legacy rows; current confidential cases are Type2 + IsConfidential.
+        if (c.Type is not (CaseType.Type2 or CaseType.Confidential))
+            return ApiResponse<ReportDto>.FailResponse("Only Type-2 cases can have investigation reports.");
+
+        var isFinal = request.IsFinal;
+        var isDraft = !isFinal && request.IsDraft;
         var report = new Report
         {
             Id = Guid.NewGuid(),
@@ -873,8 +918,8 @@ public class CaseService : ICaseService
             Content = request.Content,
             CreatedByName = createdByName,
             CreatedById = createdById,
-            IsDraft = request.IsDraft,
-            IsFinal = request.IsFinal,
+            IsDraft = isDraft,
+            IsFinal = isFinal,
             SectionsJson = request.SectionsJson
         };
 
@@ -884,8 +929,10 @@ public class CaseService : ICaseService
         {
             Id = Guid.NewGuid(),
             CaseId = caseId,
-            Action = request.IsDraft ? "Draft Report Created" : "Report Submitted",
-            Description = $"{(request.IsDraft ? "Draft report" : "Report")} created by {createdByName}.",
+            Action = isFinal ? "Report Finalized" : (isDraft ? "Draft Report Created" : "Report Submitted"),
+            Description = isFinal
+                ? $"Final report submitted by {createdByName}."
+                : $"{(isDraft ? "Draft report" : "Report")} created by {createdByName}.",
             User = createdByName
         });
 
@@ -908,6 +955,8 @@ public class CaseService : ICaseService
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
         if (c is null) return ApiResponse<ReportDto>.FailResponse("Case not found.");
+        if (c.Type is not (CaseType.Type2 or CaseType.Confidential))
+            return ApiResponse<ReportDto>.FailResponse("Only Type-2 cases can have investigation reports.");
         var report = c.Reports.FirstOrDefault(r => r.Id == reportId);
         if (report is null) return ApiResponse<ReportDto>.FailResponse("Report not found.");
 
@@ -917,9 +966,11 @@ public class CaseService : ICaseService
         if (report.CreatedById != Guid.Empty && report.CreatedById != updatedById && userRole != "super-admin")
             return ApiResponse<ReportDto>.FailResponse($"Only {report.CreatedByName} can edit this report.");
 
+        var isFinal = request.IsFinal;
+        var isDraft = !isFinal && request.IsDraft;
         report.Content = request.Content;
-        report.IsDraft = request.IsDraft;
-        report.IsFinal = request.IsFinal;
+        report.IsDraft = isDraft;
+        report.IsFinal = isFinal;
         report.SectionsJson = request.SectionsJson;
         report.UpdatedAt = DateTime.UtcNow;
 
@@ -927,8 +978,8 @@ public class CaseService : ICaseService
         {
             Id = Guid.NewGuid(),
             CaseId = caseId,
-            Action = request.IsFinal ? "Report Finalized" : (request.IsDraft ? "Draft Report Updated" : "Report Updated"),
-            Description = request.IsFinal ? $"Final report submitted by {updatedByName}." : $"Report updated by {updatedByName}.",
+            Action = isFinal ? "Report Finalized" : (isDraft ? "Draft Report Updated" : "Report Updated"),
+            Description = isFinal ? $"Final report submitted by {updatedByName}." : $"Report updated by {updatedByName}.",
             User = updatedByName
         });
 

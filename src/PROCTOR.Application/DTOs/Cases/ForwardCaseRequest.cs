@@ -8,4 +8,5 @@ public class ForwardCaseRequest
     public string? Verdict { get; set; }
     public string? AssignedToUserId { get; set; }
     public bool ForwardToAll { get; set; }
+    public bool MarkAsConfidential { get; set; }
 }

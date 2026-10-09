@@ -10,9 +10,12 @@ public static class MenuPermissionSeeder
     private static readonly string[] AllMenuKeys =
     {
         "dashboard", "advanced-search", "submit", "incidents", "cases", "hearings",
-        "confidential", "monitoring", "reports", "users", "settings",
-        "my-cases", "notifications"
+        "confidential", "monitoring", "reports", "completed-reports", "users", "settings",
+        "my-cases", "notifications", "registrar-reports", "vc-reports", "dc-reports",
+        "dc-member-reports", "dcs-reports", "chairman-reports", "audit-logs"
     };
+    private static readonly HashSet<string> Type3StageMenuKeys =
+        ["registrar-reports", "vc-reports", "dc-reports", "dc-member-reports", "dcs-reports", "chairman-reports"];
 
     public static async Task SeedAsync(ProctorDbContext context)
     {
@@ -57,12 +60,15 @@ public static class MenuPermissionSeeder
             ["notifications"] = "R",
             ["hearings"] = "CRUD",
             ["reports"] = "R",
+            ["completed-reports"] = "R",
             ["settings"] = "RU"
         });
 
         AddPermissions(permissions, UserRole.Registrar, new Dictionary<string, string>
         {
             ["dashboard"] = "R",
+            ["registrar-reports"] = "RU",
+            ["notifications"] = "R",
             ["settings"] = "RU"
         });
 
@@ -70,6 +76,7 @@ public static class MenuPermissionSeeder
         {
             ["dashboard"] = "R",
             ["reports"] = "R",
+            ["completed-reports"] = "R",
             ["settings"] = "RU"
         });
 
@@ -90,7 +97,26 @@ public static class MenuPermissionSeeder
         AddPermissions(permissions, UserRole.VC, new Dictionary<string, string>
         {
             ["dashboard"] = "R",
+            ["vc-reports"] = "RU",
+            ["notifications"] = "R",
             ["settings"] = "RU"
+        });
+
+        AddPermissions(permissions, UserRole.DCChairman, new Dictionary<string, string>
+        {
+            ["dashboard"] = "R", ["dc-reports"] = "RU", ["notifications"] = "R", ["settings"] = "RU"
+        });
+        AddPermissions(permissions, UserRole.DCMember, new Dictionary<string, string>
+        {
+            ["dashboard"] = "R", ["dc-member-reports"] = "RU", ["notifications"] = "R", ["settings"] = "RU"
+        });
+        AddPermissions(permissions, UserRole.DCSecretary, new Dictionary<string, string>
+        {
+            ["dashboard"] = "R", ["dcs-reports"] = "CRU", ["notifications"] = "R", ["settings"] = "RU"
+        });
+        AddPermissions(permissions, UserRole.Chairman, new Dictionary<string, string>
+        {
+            ["dashboard"] = "R", ["chairman-reports"] = "RU", ["notifications"] = "R", ["settings"] = "RU"
         });
 
         AddFullCrudPermissions(permissions, UserRole.SuperAdmin);
@@ -127,6 +153,7 @@ public static class MenuPermissionSeeder
         var changed = false;
         foreach (var menuKey in AllMenuKeys)
         {
+            if (Type3StageMenuKeys.Contains(menuKey) || menuKey == "audit-logs") continue;
             if (existing.TryGetValue(menuKey, out var row))
             {
                 if (row.CanCreate && row.CanRead && row.CanUpdate && row.CanDelete) continue;
@@ -189,6 +216,42 @@ public static class MenuPermissionSeeder
     }
 
     /// <summary>
+    /// Existing roles keep the same access to finalized reports that they already had to the
+    /// original reports page. The two permissions can be changed independently afterwards.
+    /// </summary>
+    public static async Task BackfillCompletedReportsAsync(ProctorDbContext context)
+    {
+        var reportPermissions = await context.MenuPermissions
+            .Where(p => p.MenuKey == "reports")
+            .ToListAsync();
+        var existingRoleIds = (await context.MenuPermissions
+            .Where(p => p.MenuKey == "completed-reports")
+            .Select(p => p.RoleId)
+            .ToListAsync())
+            .ToHashSet();
+
+        var additions = reportPermissions
+            .Where(p => !existingRoleIds.Contains(p.RoleId))
+            .Select(p => new MenuPermission
+            {
+                Id = Guid.NewGuid(),
+                RoleId = p.RoleId,
+                MenuKey = "completed-reports",
+                CanCreate = p.CanCreate,
+                CanRead = p.CanRead,
+                CanUpdate = p.CanUpdate,
+                CanDelete = p.CanDelete,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (additions.Count == 0) return;
+        await context.MenuPermissions.AddRangeAsync(additions);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
     /// Grants the External role its menus on databases seeded before the role existed.
     /// Idempotent: skips any (role, menuKey) pair already present.
     /// </summary>
@@ -212,6 +275,7 @@ public static class MenuPermissionSeeder
                 CanRead = access.Contains('R'),
                 CanUpdate = access.Contains('U'),
                 CanDelete = access.Contains('D'),
+                CanSend = access.Contains('S'),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -240,6 +304,7 @@ public static class MenuPermissionSeeder
                 CanRead = access.Contains('R'),
                 CanUpdate = access.Contains('U'),
                 CanDelete = access.Contains('D'),
+                CanSend = access.Contains('S'),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -321,19 +386,89 @@ public static class MenuPermissionSeeder
         foreach (var menuKey in AllMenuKeys)
         {
             if (excludeMenuKeys.Contains(menuKey)) continue;
+            if (role != UserRole.SuperAdmin && Type3StageMenuKeys.Contains(menuKey)) continue;
+            if (role != UserRole.SuperAdmin && menuKey == "audit-logs") continue;
+
+            var auditReadOnly = menuKey == "audit-logs";
 
             permissions.Add(new MenuPermission
             {
                 Id = Guid.NewGuid(),
                 RoleId = roleId,
                 MenuKey = menuKey,
-                CanCreate = true,
+                CanCreate = !auditReadOnly,
                 CanRead = true,
-                CanUpdate = true,
-                CanDelete = true,
+                CanUpdate = !auditReadOnly,
+                CanDelete = !auditReadOnly,
+                CanSend = menuKey == "completed-reports" && role is UserRole.Proctor or UserRole.SuperAdmin,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
         }
+    }
+
+    public static async Task BackfillAuditLogPermissionAsync(ProctorDbContext context)
+    {
+        var roleId = RoleSeeder.GetDeterministicGuid(UserRole.SuperAdmin);
+        if (await context.MenuPermissions.AnyAsync(x => x.RoleId == roleId && x.MenuKey == "audit-logs")) return;
+
+        context.MenuPermissions.Add(new MenuPermission
+        {
+            Id = Guid.NewGuid(),
+            RoleId = roleId,
+            MenuKey = "audit-logs",
+            CanRead = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+    }
+
+    public static async Task BackfillType3PermissionsAsync(ProctorDbContext context)
+    {
+        const string flagKey = "type3_permissions_backfilled";
+        if (await context.SystemSettings.AnyAsync(x => x.Key == flagKey && x.Value == "true")) return;
+        var grants = new Dictionary<UserRole, (string Menu, string Access)[]>
+        {
+            [UserRole.Registrar] = [("registrar-reports", "RU")],
+            [UserRole.VC] = [("vc-reports", "RU")],
+            [UserRole.DCChairman] = [("dashboard", "R"), ("dc-reports", "RU"), ("notifications", "R"), ("settings", "RU")],
+            [UserRole.DCMember] = [("dashboard", "R"), ("dc-member-reports", "RU"), ("notifications", "R"), ("settings", "RU")],
+            [UserRole.DCSecretary] = [("dashboard", "R"), ("dcs-reports", "CRU"), ("notifications", "R"), ("settings", "RU")],
+            [UserRole.Chairman] = [("dashboard", "R"), ("chairman-reports", "RU"), ("notifications", "R"), ("settings", "RU")]
+        };
+
+        foreach (var (role, rows) in grants)
+        {
+            var roleId = RoleSeeder.GetDeterministicGuid(role);
+            foreach (var (menu, access) in rows)
+            {
+                if (await context.MenuPermissions.AnyAsync(x => x.RoleId == roleId && x.MenuKey == menu)) continue;
+                context.MenuPermissions.Add(new MenuPermission
+                {
+                    Id = Guid.NewGuid(), RoleId = roleId, MenuKey = menu,
+                    CanCreate = access.Contains('C'), CanRead = access.Contains('R'),
+                    CanUpdate = access.Contains('U'), CanDelete = access.Contains('D'), CanSend = access.Contains('S')
+                });
+            }
+        }
+
+        foreach (var role in new[] { UserRole.Proctor, UserRole.SuperAdmin })
+        {
+            var roleId = RoleSeeder.GetDeterministicGuid(role);
+            var permission = await context.MenuPermissions.FirstOrDefaultAsync(x => x.RoleId == roleId && x.MenuKey == "completed-reports");
+            if (permission is null)
+                context.MenuPermissions.Add(new MenuPermission { Id = Guid.NewGuid(), RoleId = roleId, MenuKey = "completed-reports", CanRead = true, CanSend = true });
+            else
+                permission.CanSend = true;
+        }
+
+        context.SystemSettings.Add(new SystemSetting
+        {
+            Id = Guid.NewGuid(), Key = flagKey, Value = "true", Category = "internal",
+            Description = "Guard flag: Type-3 menus and initial Send permissions were seeded once."
+        });
+
+        await context.SaveChangesAsync();
     }
 }

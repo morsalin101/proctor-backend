@@ -19,5 +19,9 @@ public enum UserRole
     /// created automatically when they are added to a hearing panel; they can sign in but
     /// only see the cases they are assigned to.
     /// </summary>
-    External
+    External,
+    DCChairman,
+    DCMember,
+    DCSecretary,
+    Chairman
 }

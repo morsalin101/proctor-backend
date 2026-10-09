@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using PROCTOR.Application.Common;
 
 namespace PROCTOR.API.Middleware;
@@ -19,6 +20,18 @@ public class ExceptionHandlingMiddleware
         try
         {
             await _next(context);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "A stale or duplicate database update was rejected");
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = StatusCodes.Status409Conflict;
+            var response = ApiResponse<object>.FailResponse(
+                "This record was already changed by another action. Refresh the page and try again.");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
         }
         catch (Exception ex)
         {

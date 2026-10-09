@@ -8,4 +8,5 @@ public class MenuPermissionDto
     public bool CanRead { get; set; }
     public bool CanUpdate { get; set; }
     public bool CanDelete { get; set; }
+    public bool CanSend { get; set; }
 }

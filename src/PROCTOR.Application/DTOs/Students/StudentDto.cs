@@ -6,6 +6,7 @@ public class StudentDto
     public string StudentId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Department { get; set; }
+    public string Batch { get; set; } = string.Empty;
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public string Gender { get; set; } = "unspecified";
@@ -22,6 +23,7 @@ public class CreateStudentRequest
     public string StudentId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Department { get; set; }
+    public string? Batch { get; set; }
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public string? Gender { get; set; }

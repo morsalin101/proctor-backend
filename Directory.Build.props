@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- Keep MSBuild output paths cross-platform. Backslash-based defaults had created
+         literal bin\Debug folders on macOS and recursively polluted later builds. -->
+    <BaseOutputPath>bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj/</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**;bin\**;obj\**</DefaultItemExcludes>
+    <!-- The local .NET 10 SDK can deadlock while evaluating this project's reference graph
+         with parallel workers; deterministic single-worker project builds are fast here. -->
+    <BuildInParallel>false</BuildInParallel>
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+</Project>

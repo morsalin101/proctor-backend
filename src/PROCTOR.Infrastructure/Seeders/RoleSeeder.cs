@@ -71,6 +71,9 @@ public static class RoleSeeder
         // Administrative Officer and carries the same power as the Proctor.
         UserRole.Coordinator => "Assistant Administrative Officer",
         UserRole.FemaleCoordinator => "Female Administrative Officer",
+        UserRole.DCChairman => "DC Chairman",
+        UserRole.DCMember => "DC Member",
+        UserRole.DCSecretary => "DC Secretary",
         _ => InsertSpaces(role.ToString())
     };
 

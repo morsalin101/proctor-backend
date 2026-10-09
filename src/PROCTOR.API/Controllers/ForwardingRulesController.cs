@@ -22,16 +22,16 @@ public class ForwardingRulesController : ControllerBase
     }
 
     [HttpGet("from/{role}")]
-    public async Task<IActionResult> GetForRole(string role)
+    public async Task<IActionResult> GetForRole(string role, [FromQuery] string caseType = "type-2")
     {
-        var response = await _service.GetRulesForRoleAsync(role);
+        var response = await _service.GetRulesForRoleAsync(role, caseType);
         return Ok(response);
     }
 
     [HttpGet("special/{role}")]
-    public async Task<IActionResult> GetSpecial(string role)
+    public async Task<IActionResult> GetSpecial(string role, [FromQuery] string caseType = "type-2")
     {
-        var response = await _service.GetSpecialPermissionsAsync(role);
+        var response = await _service.GetSpecialPermissionsAsync(role, caseType);
         return Ok(response);
     }
 

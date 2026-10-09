@@ -48,7 +48,6 @@ public class CaseCategoryService : ICaseCategoryService
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = request.Description,
-            IsConfidential = request.IsConfidential,
             IsActive = request.IsActive,
             AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType),
             SortOrder = request.SortOrder,
@@ -67,7 +66,6 @@ public class CaseCategoryService : ICaseCategoryService
 
         if (request.Name is not null) entity.Name = request.Name.Trim();
         if (request.Description is not null) entity.Description = request.Description;
-        if (request.IsConfidential.HasValue) entity.IsConfidential = request.IsConfidential.Value;
         if (request.IsActive.HasValue) entity.IsActive = request.IsActive.Value;
         if (request.AppliesToType is not null)
             entity.AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType);
@@ -84,11 +82,9 @@ public class CaseCategoryService : ICaseCategoryService
         var entity = await _repo.GetByIdAsync(id);
         if (entity is null) return ApiResponse<bool>.FailResponse("Category not found.");
 
-        // Soft delete to preserve historical case references
-        entity.IsActive = false;
-        _repo.Update(entity);
+        _repo.Remove(entity);
         await _unitOfWork.SaveChangesAsync();
 
-        return ApiResponse<bool>.SuccessResponse(true, "Category deactivated.");
+        return ApiResponse<bool>.SuccessResponse(true, "Category deleted.");
     }
 }

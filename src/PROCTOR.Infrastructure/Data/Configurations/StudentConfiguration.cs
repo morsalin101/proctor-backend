@@ -20,6 +20,12 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .IsRequired()
             .HasMaxLength(200);
 
+        builder.Property(s => s.Batch)
+            .IsRequired()
+            .HasMaxLength(64);
+
+        builder.HasIndex(s => s.Batch);
+
         builder.Property(s => s.Gender)
             .HasConversion<string>();
 

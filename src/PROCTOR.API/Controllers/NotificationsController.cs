@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PROCTOR.Application.Common;
 using PROCTOR.Application.Interfaces;
+using PROCTOR.Application.Mapping;
 
 namespace PROCTOR.API.Controllers;
 
@@ -25,7 +26,7 @@ public class NotificationsController : ControllerBase
     }
 
     private string GetCurrentUserRole() =>
-        User.FindFirst("role")?.Value ?? "";
+        (User.FindFirst("role")?.Value ?? "").NormalizeRoleKey();
 
     [HttpGet]
     public async Task<IActionResult> GetNotifications()

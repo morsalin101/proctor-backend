@@ -12,6 +12,8 @@ public static class SystemSettingSeeder
         ["case_viewing_type1"] = ("student,coordinator,proctor,assistant-proctor,deputy-proctor,registrar,disciplinary-committee,vc,super-admin", "case_viewing", "Roles that can see Type-1 cases"),
         ["case_viewing_type2"] = ("student,coordinator,proctor,assistant-proctor,deputy-proctor,registrar,disciplinary-committee,vc,super-admin", "case_viewing", "Roles that can see Type-2 cases"),
         ["case_viewing_confidential"] = ("proctor,coordinator,female-coordinator,sexual-harassment-committee,vc,super-admin", "case_viewing", "Roles that can see Confidential cases"),
+        ["investigation_attachment_view_roles"] = ("proctor,coordinator,female-coordinator,registrar,vc,dc-chairman,dc-member,dc-secretary,chairman,super-admin", "investigation_access", "Roles allowed to view investigation attachments"),
+        ["investigation_attachment_upload_roles"] = ("proctor,coordinator,female-coordinator,dc-secretary,super-admin", "investigation_access", "Roles allowed to upload investigation attachments"),
 
         // Proctor Office 24/7 Control Room number. Included in the Type-1 acknowledgment
         // ("we are coming") so the complainant always has a live contact. Editable in Settings.

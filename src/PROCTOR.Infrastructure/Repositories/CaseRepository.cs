@@ -19,6 +19,8 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Complainants)
             .Include(c => c.AssignedTo)
             .Include(c => c.Assignments)
+            .Include(c => c.Reports)
+            .Include(c => c.Type3Workflow)
             .Where(predicate)
             .ToListAsync();
     }
@@ -37,6 +39,7 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Category)
             .Include(c => c.AdditionalInfos)
             .Include(c => c.Assignments).ThenInclude(a => a.User)
+            .Include(c => c.Type3Workflow)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
@@ -57,6 +60,8 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Complainants)
             .Include(c => c.AssignedTo)
             .Include(c => c.Assignments)
+            .Include(c => c.Reports)
+            .Include(c => c.Type3Workflow)
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -105,11 +110,12 @@ public class CaseRepository : Repository<Case>, ICaseRepository
 
         // The Administrative Officer ("coordinator") is the Proctor's deputy and sees every
         // case, so no filter applies to them. The Female Coordinator stays scoped to her own
-        // track — female complainants and confidential cases — plus every instant (Type-1)
-        // incident, which the whole proctorial team responds to regardless of gender.
+        // visibility scope — female complainants and restricted cases — plus every instant
+        // (Type-1) incident, which the whole proctorial team responds to regardless of gender.
         if (userRole == "female-coordinator")
             query = query.Where(c =>
-                c.Type == CaseType.Confidential
+                c.IsConfidential
+                || c.Type == CaseType.Confidential
                 || c.Type == CaseType.Type1
                 || c.SubmitterGender == Gender.Female);
         
@@ -122,7 +128,9 @@ public class CaseRepository : Repository<Case>, ICaseRepository
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);
 
-        if (type.HasValue)
+        if (type == CaseType.Confidential)
+            query = query.Where(c => c.IsConfidential || c.Type == CaseType.Confidential);
+        else if (type.HasValue)
             query = query.Where(c => c.Type == type.Value);
 
         if (priority.HasValue)

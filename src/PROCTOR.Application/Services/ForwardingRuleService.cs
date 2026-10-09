@@ -23,28 +23,28 @@ public class ForwardingRuleService : IForwardingRuleService
         var dtos = rules.Select(r => new ForwardingRuleDto
         {
             Id = r.Id.ToString(), FromRole = r.FromRole, ToRole = r.ToRole,
-            ResultStatus = r.ResultStatus, IsActive = r.IsActive
+            AppliesToType = r.AppliesToType, ResultStatus = r.ResultStatus, IsActive = r.IsActive
         }).ToList();
         return ApiResponse<List<ForwardingRuleDto>>.SuccessResponse(dtos);
     }
 
-    public async Task<ApiResponse<List<ForwardingRuleDto>>> GetRulesForRoleAsync(string fromRole)
+    public async Task<ApiResponse<List<ForwardingRuleDto>>> GetRulesForRoleAsync(string fromRole, string caseType = "type-2")
     {
         // Exclude internal special rules (__close__, __hearing__, __assign__, __draft_report__)
         // from the role-to-role forwarding list
         var rules = await _repository.FindAsync(r =>
-            r.FromRole == fromRole && r.IsActive
+            r.FromRole == fromRole && r.IsActive && r.AppliesToType == NormalizeCaseType(caseType)
             && r.ToRole != "__close__" && r.ToRole != "__hearing__"
             && r.ToRole != "__assign__" && r.ToRole != "__draft_report__");
         var dtos = rules.Select(r => new ForwardingRuleDto
         {
             Id = r.Id.ToString(), FromRole = r.FromRole, ToRole = r.ToRole,
-            ResultStatus = r.ResultStatus, IsActive = r.IsActive
+            AppliesToType = r.AppliesToType, ResultStatus = r.ResultStatus, IsActive = r.IsActive
         }).ToList();
         return ApiResponse<List<ForwardingRuleDto>>.SuccessResponse(dtos);
     }
 
-    public async Task<ApiResponse<SpecialPermissionDto>> GetSpecialPermissionsAsync(string fromRole)
+    public async Task<ApiResponse<SpecialPermissionDto>> GetSpecialPermissionsAsync(string fromRole, string caseType = "type-2")
     {
         // Super-admin always has all special permissions
         if (fromRole == "super-admin")
@@ -53,8 +53,10 @@ public class ForwardingRuleService : IForwardingRuleService
                 CanClose = true, CanHearing = true, CanAssign = true, CanDraftReport = true
             });
 
+        var normalizedType = NormalizeCaseType(caseType);
         var rules = await _repository.FindAsync(r =>
             r.FromRole == fromRole && r.IsActive
+            && r.AppliesToType == normalizedType
             && (r.ToRole == "__close__" || r.ToRole == "__hearing__"
                 || r.ToRole == "__assign__" || r.ToRole == "__draft_report__"));
 
@@ -73,21 +75,23 @@ public class ForwardingRuleService : IForwardingRuleService
 
     public async Task<ApiResponse<ForwardingRuleDto>> CreateAsync(CreateForwardingRuleRequest request)
     {
-        var existing = await _repository.FindAsync(r => r.FromRole == request.FromRole && r.ToRole == request.ToRole);
+        var appliesToType = NormalizeCaseType(request.AppliesToType);
+        var existing = await _repository.FindAsync(r => r.FromRole == request.FromRole
+            && r.ToRole == request.ToRole && r.AppliesToType == appliesToType);
         if (existing.Any())
             return ApiResponse<ForwardingRuleDto>.FailResponse("Rule already exists for this role combination.");
 
         var rule = new ForwardingRule
         {
             Id = Guid.NewGuid(), FromRole = request.FromRole, ToRole = request.ToRole,
-            ResultStatus = request.ResultStatus
+            AppliesToType = appliesToType, ResultStatus = request.ResultStatus
         };
         await _repository.AddAsync(rule);
         await _unitOfWork.SaveChangesAsync();
         return ApiResponse<ForwardingRuleDto>.SuccessResponse(new ForwardingRuleDto
         {
             Id = rule.Id.ToString(), FromRole = rule.FromRole, ToRole = rule.ToRole,
-            ResultStatus = rule.ResultStatus, IsActive = rule.IsActive
+            AppliesToType = rule.AppliesToType, ResultStatus = rule.ResultStatus, IsActive = rule.IsActive
         }, "Forwarding rule created.");
     }
 
@@ -103,7 +107,7 @@ public class ForwardingRuleService : IForwardingRuleService
         return ApiResponse<ForwardingRuleDto>.SuccessResponse(new ForwardingRuleDto
         {
             Id = rule.Id.ToString(), FromRole = rule.FromRole, ToRole = rule.ToRole,
-            ResultStatus = rule.ResultStatus, IsActive = rule.IsActive
+            AppliesToType = rule.AppliesToType, ResultStatus = rule.ResultStatus, IsActive = rule.IsActive
         }, "Rule updated.");
     }
 
@@ -115,4 +119,7 @@ public class ForwardingRuleService : IForwardingRuleService
         await _unitOfWork.SaveChangesAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Rule deleted.");
     }
+
+    private static string NormalizeCaseType(string? caseType) =>
+        string.Equals(caseType, "type-1", StringComparison.OrdinalIgnoreCase) ? "type-1" : "type-2";
 }

@@ -113,7 +113,10 @@ public class CasesController : ControllerBase
         // Assignment permission is dynamic: a role may assign only if it has the
         // __assign__ special forwarding permission (configured in Settings → Forwarding).
         var role = GetCurrentUserRole();
-        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role);
+        var caseResponse = await _caseService.GetCaseByIdAsync(id, role);
+        if (!caseResponse.Success || caseResponse.Data is null)
+            return NotFound(caseResponse);
+        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
         if (!(special.Data?.CanAssign ?? false))
             return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have case assignment permission."));
 
@@ -132,7 +135,8 @@ public class CasesController : ControllerBase
     {
         var updatedBy = GetCurrentUserName();
         var userRole = GetCurrentUserRole();
-        var response = await _caseService.UpdateCaseStatusAsync(id, request, updatedBy, userRole);
+        var actingUserId = Guid.TryParse(GetCurrentUserId(), out var uid) ? uid : Guid.Empty;
+        var response = await _caseService.UpdateCaseStatusAsync(id, request, updatedBy, userRole, actingUserId);
         if (!response.Success)
             return BadRequest(response);
 
@@ -156,12 +160,17 @@ public class CasesController : ControllerBase
     [HttpPost("{id:guid}/reports")]
     public async Task<IActionResult> CreateReport(Guid id, [FromBody] CreateReportRequest request)
     {
-        // Draft report permission is dynamic: a role may create draft reports only if it has
-        // the __draft_report__ special forwarding permission (configured in Settings → Forwarding).
+        // Pending Reports → Create is the primary report permission. Keep the case-type
+        // __draft_report__ rule as an additional, narrower grant for workflow-only roles.
         var role = GetCurrentUserRole();
-        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role);
-        if (!(special.Data?.CanDraftReport ?? false))
-            return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have draft report permission."));
+        var caseResponse = await _caseService.GetCaseByIdAsync(id, role);
+        if (!caseResponse.Success || caseResponse.Data is null)
+            return NotFound(caseResponse);
+        var canCreateFromMenu = await _permissionChecker.HasPermissionAsync(role, "reports", "create");
+        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
+        if (!canCreateFromMenu && !(special.Data?.CanDraftReport ?? false))
+            return StatusCode(403, ApiResponse<object>.FailResponse(
+                "Your role cannot create reports. Enable Pending Reports → Create or the case-type Create draft report permission."));
 
         var createdByName = GetCurrentUserName();
         var userIdStr = GetCurrentUserId();

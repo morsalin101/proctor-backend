@@ -19,6 +19,19 @@ namespace PROCTOR.Application.Mapping;
 
 public static class MappingExtensions
 {
+    public static string NormalizeRoleKey(this string role) => role switch
+    {
+        // Compatibility for access tokens issued by the former regex-based JWT mapper.
+        "v-c" => "vc",
+        "d-c-chairman" => "dc-chairman",
+        "d-c-member" => "dc-member",
+        "d-c-secretary" => "dc-secretary",
+        "dcchairman" => "dc-chairman",
+        "dcmember" => "dc-member",
+        "dcsecretary" => "dc-secretary",
+        _ => role
+    };
+
     public static string ToKebabCase(this Enum value)
     {
         var name = value.ToString();
@@ -32,7 +45,13 @@ public static class MappingExtensions
             {
                 var prevIsLower = char.IsLower(name[i - 1]);
                 var prevIsDigit = char.IsDigit(name[i - 1]);
-                if (prevIsLower || prevIsDigit)
+                // Split both normal PascalCase and an acronym-to-word boundary:
+                // AssistantProctor -> assistant-proctor, DCChairman -> dc-chairman,
+                // while keeping a complete acronym such as VC -> vc.
+                var acronymWordBoundary = char.IsUpper(name[i - 1])
+                    && i + 1 < name.Length
+                    && char.IsLower(name[i + 1]);
+                if (prevIsLower || prevIsDigit || acronymWordBoundary)
                 {
                     sb.Append('-');
                 }
@@ -87,7 +106,10 @@ public static class MappingExtensions
         CaseNumber = c.CaseNumber,
         StudentName = c.StudentName,
         StudentId = c.StudentId,
-        Type = c.Type.ToKebabCase(),
+        Type = c.IsConfidential && c.Type != CaseType.Type3 ? "confidential" : c.Type.ToKebabCase(),
+        IsConfidential = c.IsConfidential || c.Type == CaseType.Confidential,
+        Type3Stage = c.Type3Workflow?.CurrentStage.ToKebabCase(),
+        WorkflowStatusLabel = c.Type3Workflow is null ? null : Type3StageLabel(c.Type3Workflow.CurrentStage),
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
@@ -99,9 +121,9 @@ public static class MappingExtensions
         Recommendation = c.Recommendation,
         ForwardedToRole = c.ForwardedToRole,
         SubmittedByUserId = c.SubmittedByUserId?.ToString(),
+        SubmitterGender = c.SubmitterGender.ToKebabCase(),
         CategoryId = c.CategoryId?.ToString(),
         CategoryName = c.Category?.Name,
-        CategoryIsConfidential = c.Category?.IsConfidential ?? false,
         IsAcknowledged = c.IsAcknowledged,
         AcknowledgedAt = c.AcknowledgedAt?.ToString("o"),
         AcknowledgedById = c.AcknowledgedById?.ToString(),
@@ -174,7 +196,6 @@ public static class MappingExtensions
         Id = c.Id.ToString(),
         Name = c.Name,
         Description = c.Description,
-        IsConfidential = c.IsConfidential,
         IsActive = c.IsActive,
         AppliesToType = c.AppliesToType.ToKebabCase(),
         SortOrder = c.SortOrder
@@ -186,7 +207,10 @@ public static class MappingExtensions
         CaseNumber = c.CaseNumber,
         StudentName = c.StudentName,
         StudentId = c.StudentId,
-        Type = c.Type.ToKebabCase(),
+        Type = c.IsConfidential && c.Type != CaseType.Type3 ? "confidential" : c.Type.ToKebabCase(),
+        IsConfidential = c.IsConfidential || c.Type == CaseType.Confidential,
+        Type3Stage = c.Type3Workflow?.CurrentStage.ToKebabCase(),
+        WorkflowStatusLabel = c.Type3Workflow is null ? null : Type3StageLabel(c.Type3Workflow.CurrentStage),
         Status = c.Status.ToKebabCase(),
         Priority = c.Priority.ToKebabCase(),
         AssignedTo = c.AssignedTo?.Name,
@@ -197,7 +221,6 @@ public static class MappingExtensions
         Verdict = c.Verdict,
         ForwardedToRole = c.ForwardedToRole,
         CategoryName = c.Category?.Name,
-        CategoryIsConfidential = c.Category?.IsConfidential ?? false,
         IsAcknowledged = c.IsAcknowledged,
         IncidentLocationDescription = c.IncidentLocationDescription,
         IncidentLatitude = c.IncidentLatitude,
@@ -312,7 +335,21 @@ public static class MappingExtensions
         CanCreate = mp.CanCreate,
         CanRead = mp.CanRead,
         CanUpdate = mp.CanUpdate,
-        CanDelete = mp.CanDelete
+        CanDelete = mp.CanDelete,
+        CanSend = mp.CanSend
+    };
+
+    private static string Type3StageLabel(Type3WorkflowStage stage) => stage switch
+    {
+        Type3WorkflowStage.RegistrarReview => "Sent to Registrar",
+        Type3WorkflowStage.VcReview => "Forwarded to VC",
+        Type3WorkflowStage.DcChairmanReview => "Forwarded to DC Chairman",
+        Type3WorkflowStage.DcMemberReview => "Awaiting DC Member Remarks",
+        Type3WorkflowStage.DcSecretaryReview => "Awaiting Resolution",
+        Type3WorkflowStage.ResolutionDcChairmanReview => "Resolution Sent to DC Chairman",
+        Type3WorkflowStage.ChairmanReview => "Resolution Sent to Chairman",
+        Type3WorkflowStage.Completed => "Resolution Approved",
+        _ => stage.ToString()
     };
 
     public static CaseComplainantDto ToDto(this CaseComplainant c) => new()

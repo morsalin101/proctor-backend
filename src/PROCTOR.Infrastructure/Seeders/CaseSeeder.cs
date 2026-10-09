@@ -9,8 +9,11 @@ public static class CaseSeeder
 {
     public static async Task SeedAsync(ProctorDbContext context)
     {
-        // Check if Bangla cases are already seeded
-        if (await context.Cases.AnyAsync(c => c.Description.Contains("ঘটেছে"))) return;
+        await RepairSeededConfidentialCasesAsync(context);
+
+        // The description contains a stable demo marker. The previous check used a word that
+        // was not present in the seeded text, so every restart could insert another 20 cases.
+        if (await context.Cases.AnyAsync(c => c.Description.Contains("ডামি কেস"))) return;
 
         var categories = await context.CaseCategories.Where(c => c.IsActive).ToListAsync();
         var studentUser = await context.Users.FirstOrDefaultAsync(u => u.Role == UserRole.Student);
@@ -28,7 +31,10 @@ public static class CaseSeeder
 
         for (int i = 1; i <= 20; i++)
         {
-            var isMale = rand.Next(2) == 0;
+            var type = i % 3 == 0 ? CaseType.Type1 : (i % 7 == 0 ? CaseType.Confidential : CaseType.Type2);
+            // Confidentiality is a deliberate decision made by the female administrative
+            // officer after female-track intake. Never create a male confidential demo case.
+            var isMale = type != CaseType.Confidential && rand.Next(2) == 0;
             var firstName = isMale ? firstNamesMale[rand.Next(firstNamesMale.Length)] : firstNamesFemale[rand.Next(firstNamesFemale.Length)];
             var lastName = lastNames[rand.Next(lastNames.Length)];
             var studentName = $"{firstName} {lastName}";
@@ -40,8 +46,6 @@ public static class CaseSeeder
 
             var dept = departments[rand.Next(departments.Length)];
             var category = categories[rand.Next(categories.Count)];
-            var type = i % 3 == 0 ? CaseType.Type1 : (i % 7 == 0 ? CaseType.Confidential : CaseType.Type2);
-
             var incidentDate = DateTime.UtcNow.AddDays(-rand.Next(1, 100));
             var term = incidentDate.Month switch
             {
@@ -56,8 +60,9 @@ public static class CaseSeeder
                 CaseNumber = $"DIU-{DateTime.UtcNow.Year}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}",
                 StudentName = studentName,
                 StudentId = $"0{rand.Next(1, 9)}{rand.Next(1, 3)}-{rand.Next(11, 40)}-{rand.Next(1000, 9999)}",
-                Type = type,
-                Status = CaseStatus.Submitted,
+                Type = type == CaseType.Confidential ? CaseType.Type2 : type,
+                IsConfidential = type == CaseType.Confidential,
+                Status = type == CaseType.Confidential ? CaseStatus.Assigned : CaseStatus.Submitted,
                 Priority = type == CaseType.Type1 ? Priority.High : Priority.Medium,
                 Description = $"এটি {dept} বিভাগে {studentName} এর সাথে ঘটে যাওয়া একটি ঘটনার ডামি কেস। ঘটনাটি সম্পর্কে বিস্তারিত তদন্তের জন্য অভিযোগটি দাখিল করা হলো।",
                 SubmittedByUserId = studentUser.Id,
@@ -66,20 +71,93 @@ public static class CaseSeeder
                 IncidentDate = incidentDate,
                 AcademicSemester = $"{term}-{incidentDate.Year}",
                 StudentDepartment = dept,
-                StudentSemester = rand.Next(1, 12),
+                StudentSemester = rand.Next(1, 13),
                 StudentCgpa = (decimal)(2.5 + rand.NextDouble() * 1.5),
                 StudentContact = $"017{rand.Next(10000000, 99999999)}",
                 AccusedName = accusedName,
                 AccusedId = $"0{rand.Next(1, 9)}{rand.Next(1, 3)}-{rand.Next(11, 40)}-{rand.Next(1000, 9999)}",
                 AccusedDepartment = departments[rand.Next(departments.Length)],
                 AccusedContact = $"017{rand.Next(10000000, 99999999)}",
+                ForwardedToRole = type == CaseType.Confidential ? "sexual-harassment-committee" : null,
                 CreatedAt = incidentDate.AddDays(1)
             };
+
+            newCase.TimelineEvents.Add(new TimelineEvent
+            {
+                Id = Guid.NewGuid(), CaseId = newCase.Id, Action = "Case Created",
+                Description = $"Case {newCase.CaseNumber} was created.", User = studentName,
+                CreatedAt = newCase.CreatedAt
+            });
+
+            if (type == CaseType.Confidential)
+            {
+                newCase.TimelineEvents.Add(new TimelineEvent
+                {
+                    Id = Guid.NewGuid(), CaseId = newCase.Id, Action = "Marked Confidential",
+                    Description = "Female-submitted case explicitly marked confidential by the female Assistant Administrative Officer before forwarding.",
+                    User = "Female Assistant Administrative Officer", CreatedAt = newCase.CreatedAt.AddHours(1)
+                });
+                newCase.TimelineEvents.Add(new TimelineEvent
+                {
+                    Id = Guid.NewGuid(), CaseId = newCase.Id, Action = "Case Forwarded",
+                    Description = "Confidential case forwarded to the Sexual Harassment Committee.",
+                    User = "Female Assistant Administrative Officer", CreatedAt = newCase.CreatedAt.AddHours(1)
+                });
+            }
 
             cases.Add(newCase);
         }
 
         await context.Cases.AddRangeAsync(cases);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task RepairSeededConfidentialCasesAsync(ProctorDbContext context)
+    {
+        var seeded = await context.Cases
+            .Where(c => c.Type == CaseType.Confidential && c.Description.Contains("ডামি কেস"))
+            .ToListAsync();
+        if (seeded.Count == 0) return;
+
+        var ids = seeded.Select(c => c.Id).ToList();
+        var existingActions = await context.TimelineEvents
+            .Where(e => ids.Contains(e.CaseId))
+            .Select(e => new { e.CaseId, e.Action })
+            .ToListAsync();
+
+        foreach (var c in seeded)
+        {
+            if (c.SubmitterGender != Gender.Female)
+            {
+                var previousName = c.StudentName;
+                c.StudentName = "সামিহা আক্তার";
+                c.Description = c.Description.Replace(previousName, c.StudentName, StringComparison.Ordinal);
+            }
+            c.SubmitterGender = Gender.Female;
+            c.Status = CaseStatus.Assigned;
+            c.ForwardedToRole = "sexual-harassment-committee";
+
+            if (!existingActions.Any(e => e.CaseId == c.Id && e.Action == "Marked Confidential"))
+            {
+                context.TimelineEvents.Add(new TimelineEvent
+                {
+                    Id = Guid.NewGuid(), CaseId = c.Id, Action = "Marked Confidential",
+                    Description = "Female-submitted case explicitly marked confidential by the female Assistant Administrative Officer before forwarding.",
+                    User = "Female Assistant Administrative Officer", CreatedAt = c.CreatedAt.AddHours(1)
+                });
+            }
+
+            if (!existingActions.Any(e => e.CaseId == c.Id && e.Action == "Case Forwarded"))
+            {
+                context.TimelineEvents.Add(new TimelineEvent
+                {
+                    Id = Guid.NewGuid(), CaseId = c.Id, Action = "Case Forwarded",
+                    Description = "Confidential case forwarded to the Sexual Harassment Committee.",
+                    User = "Female Assistant Administrative Officer", CreatedAt = c.CreatedAt.AddHours(1)
+                });
+            }
+        }
+
         await context.SaveChangesAsync();
     }
 }

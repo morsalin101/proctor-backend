@@ -87,40 +87,44 @@ public class WorkflowService : IWorkflowService
         }
     }
 
-    public async Task<bool> ValidateTransitionAsync(CaseStatus from, CaseStatus to, string userRole)
+    public async Task<bool> ValidateTransitionAsync(CaseStatus from, CaseStatus to, string userRole, CaseType caseType)
     {
         if (userRole == "super-admin") return true;
+
+        var permissionType = caseType == CaseType.Type1 ? "type-1" : "type-2";
+
+        // These actions are permission-controlled. Check them before the legacy transition
+        // map so a Type-2 grant can never make the same button appear on a Type-1 case.
+        if (to == CaseStatus.Closed || to == CaseStatus.Resolved || to == CaseStatus.PoliceCase)
+        {
+            var closeRules = await _forwardingRuleRepository.FindAsync(r =>
+                r.FromRole == userRole && r.ToRole == "__close__" && r.IsActive
+                && r.AppliesToType == permissionType);
+            return closeRules.Any();
+        }
+
+        if (to == CaseStatus.HearingScheduled)
+        {
+            var hearingRules = await _forwardingRuleRepository.FindAsync(r =>
+                r.FromRole == userRole && r.ToRole == "__hearing__" && r.IsActive
+                && r.AppliesToType == permissionType);
+            return hearingRules.Any();
+        }
 
         // Check hardcoded transitions first
         if (Transitions.TryGetValue((from, to), out var allowedRoles) && allowedRoles.Contains(userRole))
             return true;
 
-        // For close/resolve transitions, check dynamic __close__ rules.
-        // A "Case Close Permission" grants the role the ability to mark a case Resolved
-        // OR Closed (or PoliceCase as an equivalent terminal state).
-        if (to == CaseStatus.Closed || to == CaseStatus.Resolved || to == CaseStatus.PoliceCase)
-        {
-            var closeRules = await _forwardingRuleRepository.FindAsync(
-                r => r.FromRole == userRole && r.ToRole == "__close__" && r.IsActive);
-            if (closeRules.Any()) return true;
-        }
-
-        // For hearing transitions, check dynamic __hearing__ rules
-        if (to == CaseStatus.HearingScheduled)
-        {
-            var hearingRules = await _forwardingRuleRepository.FindAsync(
-                r => r.FromRole == userRole && r.ToRole == "__hearing__" && r.IsActive);
-            if (hearingRules.Any()) return true;
-        }
-
         return false;
     }
 
-    public async Task<CaseStatus?> GetForwardStatusAsync(string fromRole, string toRole, CaseStatus currentStatus)
+    public async Task<CaseStatus?> GetForwardStatusAsync(string fromRole, string toRole, CaseStatus currentStatus, CaseType caseType)
     {
+        var permissionType = caseType == CaseType.Type1 ? "type-1" : "type-2";
         // 1. Check DB-configured forwarding rules first.
         var rules = await _forwardingRuleRepository.FindAsync(
-            r => r.FromRole == fromRole && r.ToRole == toRole && r.IsActive);
+            r => r.FromRole == fromRole && r.ToRole == toRole && r.IsActive
+                && r.AppliesToType == permissionType);
         var rule = rules.FirstOrDefault();
 
         if (rule is not null && !string.IsNullOrWhiteSpace(rule.ResultStatus))

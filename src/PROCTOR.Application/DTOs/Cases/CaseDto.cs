@@ -13,6 +13,9 @@ public class CaseDto
     public string StudentName { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+    public bool IsConfidential { get; set; }
+    public string? Type3Stage { get; set; }
+    public string? WorkflowStatusLabel { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public string? AssignedTo { get; set; }
@@ -24,11 +27,11 @@ public class CaseDto
     public string? Recommendation { get; set; }
     public string? ForwardedToRole { get; set; }
     public string? SubmittedByUserId { get; set; }
+    public string SubmitterGender { get; set; } = "unspecified";
 
     // Category
     public string? CategoryId { get; set; }
     public string? CategoryName { get; set; }
-    public bool CategoryIsConfidential { get; set; }
 
     // Acknowledgment (Type-1)
     public bool IsAcknowledged { get; set; }

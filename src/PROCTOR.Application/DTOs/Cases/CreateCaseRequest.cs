@@ -12,7 +12,8 @@ public class CreateCaseRequest
     // matching coordinator (female → female coordinator, male → coordinator).
     public string? Gender { get; set; }
 
-    // Category (admin-managed). For Type-2 submissions this drives confidentiality.
+    // Category is descriptive only. Confidentiality is decided by the receiving
+    // Assistant Administrative Officer during forwarding.
     public string? CategoryId { get; set; }
 
     // Type-1 incident location (captured via browser geolocation)

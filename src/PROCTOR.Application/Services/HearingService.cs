@@ -22,9 +22,9 @@ public class HearingService : IHearingService
         _emailService = emailService;
     }
 
-    // Female-track cases: a female complainant or a confidential case.
+    // Female officer visibility includes female complaints and restricted cases.
     private static bool IsFemaleTrack(Case? c) =>
-        c is not null && (c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
+        c is not null && (c.IsConfidential || c.Type == CaseType.Confidential || c.SubmitterGender == Gender.Female);
 
     // The Administrative Officer ("coordinator") sees every hearing, matching the Proctor.
     // Only the Female Coordinator stays scoped to her own track.

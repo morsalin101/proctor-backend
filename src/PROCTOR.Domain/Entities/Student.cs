@@ -11,6 +11,7 @@ public class Student : BaseEntity
     public string StudentId { get; set; } = string.Empty; // university roll, e.g. "123"
     public string Name { get; set; } = string.Empty;
     public string? Department { get; set; }
+    public string Batch { get; set; } = string.Empty; // e.g. CSE_231, SWE_222
     public string? Contact { get; set; }
     public string? Email { get; set; }
     public Gender Gender { get; set; } = Gender.Unspecified;

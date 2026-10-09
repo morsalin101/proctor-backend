@@ -8,6 +8,7 @@ public class Case : BaseEntity
     public string StudentName { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public CaseType Type { get; set; }
+    public bool IsConfidential { get; set; }
     public CaseStatus Status { get; set; }
     public Priority Priority { get; set; }
     public Guid? AssignedToId { get; set; }
@@ -17,9 +18,8 @@ public class Case : BaseEntity
     public string? ForwardedToRole { get; set; }
     public Guid? SubmittedByUserId { get; set; }
 
-    // Complainant gender chosen on the Type-2 form. Drives the coordinator track:
-    // Female (or any confidential case) is handled only by the Female Coordinator and is
-    // hidden from the (male) Coordinator; Male is handled by the Coordinator.
+    // Complainant gender chosen on the Type-2 form. It drives initial intake routing:
+    // female → female Assistant Administrative Officer; male → male officer.
     public Gender SubmitterGender { get; set; } = Gender.Unspecified;
 
     // Type-2 form fields
@@ -56,7 +56,7 @@ public class Case : BaseEntity
     public double? IncidentLongitude { get; set; }
     public string? IncidentLocationDescription { get; set; }
 
-    // Category replaces the student-set "Confidential" flag
+    // Category is descriptive; it does not determine confidentiality.
     public Guid? CategoryId { get; set; }
     public CaseCategory? Category { get; set; }
 
@@ -71,6 +71,8 @@ public class Case : BaseEntity
     public ICollection<CaseComplainant> Complainants { get; set; } = new List<CaseComplainant>();
     public ICollection<CaseAccused> AccusedPersons { get; set; } = new List<CaseAccused>();
     public ICollection<CaseAdditionalInfo> AdditionalInfos { get; set; } = new List<CaseAdditionalInfo>();
+    public Type3Workflow? Type3Workflow { get; set; }
+    public ICollection<InvestigationAttachment> InvestigationAttachments { get; set; } = new List<InvestigationAttachment>();
 
     /// <summary>Hearing panel members (internal users + external emailed people). Stored as jsonb.</summary>
     public List<CaseHearingPerson> HearingPersons { get; set; } = new();
