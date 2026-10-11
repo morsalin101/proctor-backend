@@ -130,6 +130,19 @@ public static class StudentSeeder
             changed = true;
         }
 
+        // Production databases can contain students outside the deterministic seed list.
+        // Backfill every missing batch. Also repair UNKNOWN values produced by the original
+        // SQL migration for Bangla department names, which its ASCII-only regular expression
+        // could not convert into department codes.
+        foreach (var record in existing.Values.Where(student =>
+                     string.IsNullOrWhiteSpace(student.Batch)
+                     || student.Batch.StartsWith("UNKNOWN_", StringComparison.OrdinalIgnoreCase)))
+        {
+            record.Batch = BuildBatch(record.Department ?? "UNKNOWN", record.StudentId);
+            record.UpdatedAt = DateTime.UtcNow;
+            changed = true;
+        }
+
         if (changed) await context.SaveChangesAsync();
     }
 
@@ -161,7 +174,19 @@ public static class StudentSeeder
 
     private static string BuildBatch(string department, string studentId)
     {
-        var departmentCode = Regex.Replace(department.ToUpperInvariant(), @"[^A-Z0-9]+", string.Empty);
+        var normalizedDepartment = department.Trim().ToLowerInvariant() switch
+        {
+            "সিএসই" => "CSE",
+            "সফটওয়্যার ইঞ্জিনিয়ারিং" => "SWE",
+            "ইইই" or "ত্রিপল-ই" => "EEE",
+            "বিবিএ" => "BBA",
+            "সিভিল" => "CIVIL",
+            "টেক্সটাইল" => "TE",
+            "ইংরেজি" => "ENG",
+            "আইন" => "LAW",
+            _ => department
+        };
+        var departmentCode = Regex.Replace(normalizedDepartment.ToUpperInvariant(), @"[^A-Z0-9]+", string.Empty);
         if (string.IsNullOrWhiteSpace(departmentCode)) departmentCode = "UNKNOWN";
         departmentCode = departmentCode[..Math.Min(departmentCode.Length, 60)];
         var digits = Regex.Replace(studentId, @"\D", string.Empty);
