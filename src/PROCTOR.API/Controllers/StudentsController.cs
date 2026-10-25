@@ -37,6 +37,13 @@ public class StudentsController : ControllerBase
         Email = s.Email,
         Gender = s.Gender.ToKebabCase(),
         Cgpa = s.Cgpa,
+        OutstandingDues = s.OutstandingDues,
+        CompletedCredits = s.CompletedCredits,
+        ExpectedCredits = s.ExpectedCredits,
+        CurrentSemester = s.CurrentSemester,
+        RegistrationStatus = s.RegistrationStatus?.ToKebabCase(),
+        UnregistrationReason = s.UnregistrationReason,
+        RiskDataAsOf = s.RiskDataAsOf?.ToString("o"),
         AdvisorName = s.AdvisorName,
         FatherName = s.FatherName,
         FatherContact = s.FatherContact,
@@ -92,6 +99,24 @@ public class StudentsController : ControllerBase
 
         if (request.Cgpa is < 0 or > 4)
             return BadRequest(ApiResponse<StudentDto>.FailResponse("CGPA must be between 0 and 4."));
+        if (request.OutstandingDues is < 0)
+            return BadRequest(ApiResponse<StudentDto>.FailResponse("Outstanding dues cannot be negative."));
+        if (request.CompletedCredits is < 0 || request.ExpectedCredits is < 0)
+            return BadRequest(ApiResponse<StudentDto>.FailResponse("Credit values cannot be negative."));
+        if (request.CompletedCredits.HasValue && request.ExpectedCredits.HasValue && request.CompletedCredits > request.ExpectedCredits)
+            return BadRequest(ApiResponse<StudentDto>.FailResponse("Completed credits cannot exceed expected credits."));
+        if (request.CurrentSemester is < 1 or > 12)
+            return BadRequest(ApiResponse<StudentDto>.FailResponse("Current semester must be between 1 and 12."));
+
+        var registrationStatus = RegistrationStatus.Registered;
+        if (!string.IsNullOrWhiteSpace(request.RegistrationStatus))
+        {
+            try { registrationStatus = MappingExtensions.ParseEnum<RegistrationStatus>(request.RegistrationStatus); }
+            catch (ArgumentException)
+            {
+                return BadRequest(ApiResponse<StudentDto>.FailResponse("Registration status is invalid."));
+            }
+        }
 
         var existing = await _students.FindAsync(s => s.StudentId == sid);
         if (existing.Any())
@@ -108,6 +133,13 @@ public class StudentsController : ControllerBase
             Email = request.Email,
             Gender = string.IsNullOrWhiteSpace(request.Gender) ? Gender.Unspecified : MappingExtensions.ParseEnum<Gender>(request.Gender),
             Cgpa = request.Cgpa,
+            OutstandingDues = request.OutstandingDues,
+            CompletedCredits = request.CompletedCredits,
+            ExpectedCredits = request.ExpectedCredits,
+            CurrentSemester = request.CurrentSemester,
+            RegistrationStatus = registrationStatus,
+            UnregistrationReason = request.UnregistrationReason,
+            RiskDataAsOf = request.RiskDataAsOf ?? DateTime.UtcNow,
             AdvisorName = request.AdvisorName,
             FatherName = request.FatherName,
             FatherContact = request.FatherContact,

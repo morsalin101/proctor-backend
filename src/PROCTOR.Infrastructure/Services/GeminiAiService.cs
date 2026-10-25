@@ -410,13 +410,6 @@ public class GeminiAiService : IAiService
                 facts.Append($"- [{n.CreatedAt:yyyy-MM-dd}] {n.Author}: {n.Content}\n");
         }
 
-        if (c.AdditionalInfos.Count > 0)
-        {
-            facts.Append("\nADDITIONAL INFORMATION\n");
-            foreach (var a in c.AdditionalInfos.OrderBy(a => a.CreatedAt))
-                facts.Append($"- [{a.CreatedAt:yyyy-MM-dd}] {a.Author} ({a.AuthorRole ?? "-"}): {a.Content}\n");
-        }
-
         if (c.Documents.Count > 0)
         {
             facts.Append("\nATTACHED EVIDENCE\n");

@@ -30,7 +30,6 @@ public class ProctorDbContext : DbContext
     public DbSet<CaseAssignment> CaseAssignments => Set<CaseAssignment>();
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
     public DbSet<Student> Students => Set<Student>();
-    public DbSet<CaseAdditionalInfo> CaseAdditionalInfos => Set<CaseAdditionalInfo>();
     public DbSet<Type3Workflow> Type3Workflows => Set<Type3Workflow>();
     public DbSet<Type3WorkflowTransition> Type3WorkflowTransitions => Set<Type3WorkflowTransition>();
     public DbSet<DcMemberRemark> DcMemberRemarks => Set<DcMemberRemark>();
@@ -48,6 +47,7 @@ public class ProctorDbContext : DbContext
         {
             b.HasIndex(x => x.Name).IsUnique();
             b.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            b.Property(x => x.RiskSeverity).HasConversion<string>();
         });
 
         modelBuilder.Entity<CaseAssignment>(b =>
@@ -61,6 +61,7 @@ public class ProctorDbContext : DbContext
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(a => new { a.CaseId, a.UserId, a.IsActive });
+            b.Property(a => a.Status).HasConversion<string>();
         });
 
         modelBuilder.Entity<Case>(b =>

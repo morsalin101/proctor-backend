@@ -24,6 +24,7 @@ public static class DbSeeder
         await MenuPermissionSeeder.BackfillCompletedReportsAsync(context);
         await MenuPermissionSeeder.BackfillType3PermissionsAsync(context);
         await MenuPermissionSeeder.BackfillAuditLogPermissionAsync(context);
+        await MenuPermissionSeeder.BackfillAccusedStatisticsAsync(context);
         // A Type-3 workflow moves the finalized report through the approval chain. The linked
         // case keeps its other details, but its case type must always identify it as Type-3.
         await context.Cases
@@ -36,8 +37,10 @@ public static class DbSeeder
         await ForwardingRuleSeeder.RestrictAssignRolesAsync(context);
         await CaseCategorySeeder.SeedAsync(context);
         await StudentSeeder.SeedAsync(context);
+        await StudentSeeder.SeedRiskProfilesAsync(context);
         await StudentSeeder.BackfillCaseCgpaAsync(context);
         await CaseCategorySeeder.SeedBanglaAndMapAsync(context);
+        await CaseCategorySeeder.SeedRiskSeveritiesAsync(context);
         await CaseSeeder.SeedAsync(context);
 
         // One-shot data hygiene: delete notifications whose case has been removed.

@@ -8,6 +8,7 @@ public class CaseCategory : BaseEntity
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
     public CaseCategoryAppliesTo AppliesToType { get; set; } = CaseCategoryAppliesTo.Both;
+    public RiskSeverity RiskSeverity { get; set; } = RiskSeverity.Moderate;
     public int SortOrder { get; set; }
 
 }

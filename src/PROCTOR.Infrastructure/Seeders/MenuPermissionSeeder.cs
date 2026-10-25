@@ -39,6 +39,10 @@ public static class MenuPermissionSeeder
         AddFullCrudPermissions(permissions, UserRole.Coordinator);
 
         AddFullCrudPermissions(permissions, UserRole.Proctor);
+        AddPermissions(permissions, UserRole.Proctor, new Dictionary<string, string>
+        {
+            ["accused-statistics"] = "R"
+        });
 
         AddPermissions(permissions, UserRole.AssistantProctor, new Dictionary<string, string>
         {
@@ -420,6 +424,18 @@ public static class MenuPermissionSeeder
             CanRead = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+    }
+
+    public static async Task BackfillAccusedStatisticsAsync(ProctorDbContext context)
+    {
+        var roleId = RoleSeeder.GetDeterministicGuid(UserRole.Proctor);
+        if (await context.MenuPermissions.AnyAsync(x => x.RoleId == roleId && x.MenuKey == "accused-statistics")) return;
+        context.MenuPermissions.Add(new MenuPermission
+        {
+            Id = Guid.NewGuid(), RoleId = roleId, MenuKey = "accused-statistics", CanRead = true,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
     }

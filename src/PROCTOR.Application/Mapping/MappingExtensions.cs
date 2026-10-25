@@ -150,7 +150,7 @@ public static class MappingExtensions
         AccusedGuardianContact = c.AccusedGuardianContact,
         VideoLink = c.VideoLink,
         IncidentDate = c.IncidentDate?.ToString("o"),
-        Assignments = c.Assignments.Where(a => a.IsActive).Select(a => a.ToDto()).ToList(),
+        Assignments = c.Assignments.OrderByDescending(a => a.AssignedAt).Select(a => a.ToDto()).ToList(),
         Complainants = c.Complainants.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
         AccusedPersons = c.AccusedPersons.OrderBy(x => x.Order).Select(x => x.ToDto()).ToList(),
         Documents = c.Documents.Select(d => d.ToDto()).ToList(),
@@ -158,14 +158,6 @@ public static class MappingExtensions
         Hearings = c.Hearings.Select(h => h.ToDto()).ToList(),
         Timeline = c.TimelineEvents.OrderByDescending(t => t.CreatedAt).Select(t => t.ToDto()).ToList(),
         Reports = c.Reports.Select(r => r.ToDto()).ToList(),
-        AdditionalInfos = c.AdditionalInfos.OrderByDescending(a => a.CreatedAt).Select(a => new AdditionalInfoDto
-        {
-            Id = a.Id.ToString(),
-            Content = a.Content,
-            Author = a.Author,
-            AuthorRole = a.AuthorRole,
-            CreatedDate = a.CreatedAt.ToString("o")
-        }).ToList(),
         HearingPersons = c.HearingPersons.OrderBy(p => p.AddedAt).Select(p => new CaseHearingPersonDto
         {
             Id = p.Id,
@@ -188,7 +180,10 @@ public static class MappingExtensions
         UserContactNumber = a.User?.ContactNumber,
         AssignedAt = a.AssignedAt.ToString("o"),
         IsPrimary = a.IsPrimary,
-        IsActive = a.IsActive
+        IsActive = a.IsActive,
+        Status = a.Status.ToKebabCase(),
+        CompletedAt = a.CompletedAt?.ToString("o"),
+        CompletionAction = a.CompletionAction
     };
 
     public static CaseCategoryDto ToDto(this CaseCategory c) => new()
@@ -198,6 +193,7 @@ public static class MappingExtensions
         Description = c.Description,
         IsActive = c.IsActive,
         AppliesToType = c.AppliesToType.ToKebabCase(),
+        RiskSeverity = c.RiskSeverity.ToKebabCase(),
         SortOrder = c.SortOrder
     };
 

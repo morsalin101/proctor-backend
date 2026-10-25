@@ -36,4 +36,5 @@ public class CaseListDto
     public List<CaseAccusedDto> AccusedPersons { get; set; } = new();
     public List<CaseComplainantDto> Complainants { get; set; } = new();
     public List<ReportDto> Reports { get; set; } = new();
+    public string? TaskStatus { get; set; }
 }

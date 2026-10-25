@@ -13,18 +13,15 @@ namespace PROCTOR.API.Controllers;
 public class AiController : ControllerBase
 {
     private readonly IAiService _aiService;
-    private readonly IForwardingRuleService _forwardingRuleService;
     private readonly ICaseService _caseService;
     private readonly IPermissionChecker _permissionChecker;
 
     public AiController(
         IAiService aiService,
-        IForwardingRuleService forwardingRuleService,
         ICaseService caseService,
         IPermissionChecker permissionChecker)
     {
         _aiService = aiService;
-        _forwardingRuleService = forwardingRuleService;
         _caseService = caseService;
         _permissionChecker = permissionChecker;
     }
@@ -62,10 +59,9 @@ public class AiController : ControllerBase
         if (!caseResponse.Success || caseResponse.Data is null)
             return NotFound(caseResponse);
         var canCreateFromMenu = await _permissionChecker.HasPermissionAsync(role, "reports", "create");
-        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
-        if (!canCreateFromMenu && !(special.Data?.CanDraftReport ?? false))
+        if (!canCreateFromMenu)
             return StatusCode(403, ApiResponse<object>.FailResponse(
-                "Your role cannot create reports. Enable Pending Reports → Create or the case-type Create draft report permission."));
+                "Your role cannot create reports. Enable Pending Reports → Create."));
 
         var response = await _aiService.GenerateCaseReportAsync(caseId, request);
         if (!response.Success) return BadRequest(response);

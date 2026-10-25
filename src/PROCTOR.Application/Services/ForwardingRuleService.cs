@@ -30,12 +30,12 @@ public class ForwardingRuleService : IForwardingRuleService
 
     public async Task<ApiResponse<List<ForwardingRuleDto>>> GetRulesForRoleAsync(string fromRole, string caseType = "type-2")
     {
-        // Exclude internal special rules (__close__, __hearing__, __assign__, __draft_report__)
+        // Exclude internal special rules from the role-to-role forwarding list.
         // from the role-to-role forwarding list
         var rules = await _repository.FindAsync(r =>
             r.FromRole == fromRole && r.IsActive && r.AppliesToType == NormalizeCaseType(caseType)
             && r.ToRole != "__close__" && r.ToRole != "__hearing__"
-            && r.ToRole != "__assign__" && r.ToRole != "__draft_report__");
+            && r.ToRole != "__assign__");
         var dtos = rules.Select(r => new ForwardingRuleDto
         {
             Id = r.Id.ToString(), FromRole = r.FromRole, ToRole = r.ToRole,
@@ -50,7 +50,7 @@ public class ForwardingRuleService : IForwardingRuleService
         if (fromRole == "super-admin")
             return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto
             {
-                CanClose = true, CanHearing = true, CanAssign = true, CanDraftReport = true
+                CanClose = true, CanHearing = true, CanAssign = true
             });
 
         var normalizedType = NormalizeCaseType(caseType);
@@ -58,18 +58,16 @@ public class ForwardingRuleService : IForwardingRuleService
             r.FromRole == fromRole && r.IsActive
             && r.AppliesToType == normalizedType
             && (r.ToRole == "__close__" || r.ToRole == "__hearing__"
-                || r.ToRole == "__assign__" || r.ToRole == "__draft_report__"));
+                || r.ToRole == "__assign__"));
 
         var canClose = rules.Any(r => r.ToRole == "__close__");
         var canHearing = rules.Any(r => r.ToRole == "__hearing__");
         var canAssign = rules.Any(r => r.ToRole == "__assign__");
-        var canDraftReport = rules.Any(r => r.ToRole == "__draft_report__");
         return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto
         {
             CanClose = canClose,
             CanHearing = canHearing,
-            CanAssign = canAssign,
-            CanDraftReport = canDraftReport
+            CanAssign = canAssign
         });
     }
 

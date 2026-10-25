@@ -11,6 +11,9 @@ public class CaseAssignmentDto
     public string AssignedAt { get; set; } = string.Empty;
     public bool IsPrimary { get; set; }
     public bool IsActive { get; set; } = true;
+    public string Status { get; set; } = "pending";
+    public string? CompletedAt { get; set; }
+    public string? CompletionAction { get; set; }
 }
 
 public class AssignCaseRequest

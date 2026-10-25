@@ -16,6 +16,13 @@ public class Student : BaseEntity
     public string? Email { get; set; }
     public Gender Gender { get; set; } = Gender.Unspecified;
     public decimal? Cgpa { get; set; }
+    public decimal? OutstandingDues { get; set; }
+    public decimal? CompletedCredits { get; set; }
+    public decimal? ExpectedCredits { get; set; }
+    public int? CurrentSemester { get; set; }
+    public RegistrationStatus? RegistrationStatus { get; set; }
+    public string? UnregistrationReason { get; set; }
+    public DateTime? RiskDataAsOf { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }

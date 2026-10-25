@@ -29,5 +29,4 @@ public class SpecialPermissionDto
     public bool CanClose { get; set; }
     public bool CanHearing { get; set; }
     public bool CanAssign { get; set; }
-    public bool CanDraftReport { get; set; }
 }

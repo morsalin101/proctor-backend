@@ -7,6 +7,7 @@ public class CaseCategoryDto
     public string? Description { get; set; }
     public bool IsActive { get; set; }
     public string AppliesToType { get; set; } = "both";
+    public string RiskSeverity { get; set; } = "moderate";
     public int SortOrder { get; set; }
 }
 
@@ -16,6 +17,7 @@ public class CreateCaseCategoryRequest
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
     public string AppliesToType { get; set; } = "both";
+    public string RiskSeverity { get; set; } = "moderate";
     public int SortOrder { get; set; }
 }
 
@@ -25,5 +27,6 @@ public class UpdateCaseCategoryRequest
     public string? Description { get; set; }
     public bool? IsActive { get; set; }
     public string? AppliesToType { get; set; }
+    public string? RiskSeverity { get; set; }
     public int? SortOrder { get; set; }
 }

@@ -43,6 +43,10 @@ public class CaseCategoryService : ICaseCategoryService
         if (string.IsNullOrWhiteSpace(request.Name))
             return ApiResponse<CaseCategoryDto>.FailResponse("Name is required.");
 
+        RiskSeverity riskSeverity;
+        try { riskSeverity = MappingExtensions.ParseEnum<RiskSeverity>(request.RiskSeverity); }
+        catch (ArgumentException) { return ApiResponse<CaseCategoryDto>.FailResponse("Risk severity is invalid."); }
+
         var entity = new CaseCategory
         {
             Id = Guid.NewGuid(),
@@ -50,6 +54,7 @@ public class CaseCategoryService : ICaseCategoryService
             Description = request.Description,
             IsActive = request.IsActive,
             AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType),
+            RiskSeverity = riskSeverity,
             SortOrder = request.SortOrder,
         };
 
@@ -69,6 +74,11 @@ public class CaseCategoryService : ICaseCategoryService
         if (request.IsActive.HasValue) entity.IsActive = request.IsActive.Value;
         if (request.AppliesToType is not null)
             entity.AppliesToType = MappingExtensions.ParseEnum<CaseCategoryAppliesTo>(request.AppliesToType);
+        if (request.RiskSeverity is not null)
+        {
+            try { entity.RiskSeverity = MappingExtensions.ParseEnum<RiskSeverity>(request.RiskSeverity); }
+            catch (ArgumentException) { return ApiResponse<CaseCategoryDto>.FailResponse("Risk severity is invalid."); }
+        }
         if (request.SortOrder.HasValue) entity.SortOrder = request.SortOrder.Value;
 
         _repo.Update(entity);

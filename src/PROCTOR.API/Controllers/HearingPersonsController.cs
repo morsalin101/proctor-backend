@@ -176,12 +176,9 @@ public class HearingPersonsController : ControllerBase
     /// <summary>Links a user to the case as an active (non-primary) assignee, if not already linked.</summary>
     private void AssignToCase(Case c, Guid userId)
     {
-        var existing = c.Assignments.FirstOrDefault(a => a.UserId == userId);
+        var existing = c.Assignments.FirstOrDefault(a => a.UserId == userId && a.IsActive);
         if (existing is not null)
-        {
-            existing.IsActive = true;
             return;
-        }
 
         // Added through the unit of work (not just the parent's navigation collection) so EF
         // tracks the client-set key as Added → INSERT rather than an UPDATE matching 0 rows.
@@ -192,7 +189,8 @@ public class HearingPersonsController : ControllerBase
             UserId = userId,
             AssignedAt = DateTime.UtcNow,
             IsActive = true,
-            IsPrimary = false
+            IsPrimary = false,
+            Status = AssignmentStatus.Pending
         };
         c.Assignments.Add(assignment);
         _unitOfWork.Add(assignment);

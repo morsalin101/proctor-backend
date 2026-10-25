@@ -40,7 +40,8 @@ public class Type3WorkflowController : ControllerBase
         if (request.ReportId == Guid.Empty)
             return BadRequest(ApiResponse<object>.FailResponse("Select a finalized report to send."));
 
-        var c = await _db.Cases.Include(x => x.Reports).Include(x => x.Type3Workflow).FirstOrDefaultAsync(x => x.Id == caseId);
+        var c = await _db.Cases.Include(x => x.Reports).Include(x => x.Type3Workflow)
+            .Include(x => x.Assignments).FirstOrDefaultAsync(x => x.Id == caseId);
         if (c is null) return NotFound(ApiResponse<object>.FailResponse("Case not found."));
         var report = c.Reports.SingleOrDefault(x => x.Id == request.ReportId && x.IsFinal);
         if (report is null) return BadRequest(ApiResponse<object>.FailResponse("The selected finalized report was not found for this case."));
@@ -49,6 +50,16 @@ public class Type3WorkflowController : ControllerBase
             return BadRequest(ApiResponse<object>.FailResponse("Only finalized Type-2 or confidential cases can be sent to Type-3."));
 
         var now = DateTime.UtcNow;
+        foreach (var assignment in c.Assignments.Where(a => a.IsActive && a.UserId == UserId))
+        {
+            assignment.IsActive = false;
+            assignment.IsPrimary = false;
+            assignment.Status = AssignmentStatus.Completed;
+            assignment.CompletedAt = now;
+            assignment.CompletionAction = "sent-to-registrar";
+            assignment.UpdatedAt = now;
+        }
+        if (c.AssignedToId == UserId) c.AssignedToId = null;
         if (c.Type == CaseType.Confidential) c.IsConfidential = true;
         c.Type = CaseType.Type3;
         var workflow = new Type3Workflow

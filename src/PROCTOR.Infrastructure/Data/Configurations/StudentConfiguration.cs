@@ -32,6 +32,12 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.Cgpa)
             .HasPrecision(3, 2);
 
+        builder.Property(s => s.OutstandingDues).HasPrecision(12, 2);
+        builder.Property(s => s.CompletedCredits).HasPrecision(6, 2);
+        builder.Property(s => s.ExpectedCredits).HasPrecision(6, 2);
+        builder.Property(s => s.RegistrationStatus).HasConversion<string>();
+        builder.Property(s => s.UnregistrationReason).HasMaxLength(300);
+
         builder.Property(s => s.IsActive)
             .HasDefaultValue(true);
     }

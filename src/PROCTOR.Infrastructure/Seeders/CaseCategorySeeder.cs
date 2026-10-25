@@ -7,24 +7,46 @@ namespace PROCTOR.Infrastructure.Seeders;
 
 public static class CaseCategorySeeder
 {
+    public static async Task SeedRiskSeveritiesAsync(ProctorDbContext context)
+    {
+        const string flagKey = "case_category_risk_severity_v1";
+        if (await context.SystemSettings.AnyAsync(x => x.Key == flagKey && x.Value == "true")) return;
+        var categories = await context.CaseCategories.ToListAsync();
+        var highTerms = new[] { "harassment", "substance", "drug", "theft", "fight", "মাদক", "চুরি", "মারামারি", "হয়রানি", "হয়রানি" };
+        var lowTerms = new[] { "other", "অন্যান্য" };
+        foreach (var category in categories)
+        {
+            category.RiskSeverity = highTerms.Any(term => category.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                ? RiskSeverity.High
+                : lowTerms.Any(term => category.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    ? RiskSeverity.Low : RiskSeverity.Moderate;
+        }
+        context.SystemSettings.Add(new SystemSetting
+        {
+            Id = Guid.NewGuid(), Key = flagKey, Value = "true", Category = "internal",
+            Description = "Guard flag: case-category risk severities were seeded once."
+        });
+        await context.SaveChangesAsync();
+    }
+
     /// <summary>Add mapped Bangla choices to both new and existing installations.</summary>
     public static async Task SeedBanglaAndMapAsync(ProctorDbContext context)
     {
         const string seedKey = "bangla_case_taxonomy_seed_v1";
         if (await context.SystemSettings.AnyAsync(s => s.Key == seedKey)) return;
 
-        var choices = new (string Category, string Description)[]
+        var choices = new (string Category, string Description, RiskSeverity Severity)[]
         {
-            ("র‍্যাগিং", "নবীন বা অন্য শিক্ষার্থীকে র‍্যাগিং করা।"),
-            ("বুলিং", "শিক্ষার্থীকে ভয় দেখানো বা অপমান করা।"),
-            ("পরীক্ষায় নকল", "পরীক্ষায় অসদুপায় অবলম্বন করা।"),
-            ("মারামারি", "শারীরিক আক্রমণ বা মারামারি।"),
-            ("হুমকি ও গালিগালাজ", "হুমকি, গালিগালাজ বা মৌখিক হয়রানি।"),
-            ("যৌন হয়রানি", "যৌন হয়রানি সংক্রান্ত অভিযোগ।"),
-            ("অনলাইনে যৌন হয়রানি", "অনলাইনে যৌন হয়রানি সংক্রান্ত অভিযোগ।"),
-            ("চুরি", "চুরি সংক্রান্ত অভিযোগ।"),
-            ("সম্পত্তির ক্ষতি", "বিশ্ববিদ্যালয়ের বা ব্যক্তিগত সম্পত্তির ক্ষতি।"),
-            ("মাদক ব্যবহার", "মাদক বা নিষিদ্ধ দ্রব্য ব্যবহার সংক্রান্ত অভিযোগ।"),
+            ("র‍্যাগিং", "নবীন বা অন্য শিক্ষার্থীকে র‍্যাগিং করা।", RiskSeverity.Moderate),
+            ("বুলিং", "শিক্ষার্থীকে ভয় দেখানো বা অপমান করা।", RiskSeverity.Moderate),
+            ("পরীক্ষায় নকল", "পরীক্ষায় অসদুপায় অবলম্বন করা।", RiskSeverity.Moderate),
+            ("মারামারি", "শারীরিক আক্রমণ বা মারামারি।", RiskSeverity.High),
+            ("হুমকি ও গালিগালাজ", "হুমকি, গালিগালাজ বা মৌখিক হয়রানি।", RiskSeverity.High),
+            ("যৌন হয়রানি", "যৌন হয়রানি সংক্রান্ত অভিযোগ।", RiskSeverity.High),
+            ("অনলাইনে যৌন হয়রানি", "অনলাইনে যৌন হয়রানি সংক্রান্ত অভিযোগ।", RiskSeverity.High),
+            ("চুরি", "চুরি সংক্রান্ত অভিযোগ।", RiskSeverity.High),
+            ("সম্পত্তির ক্ষতি", "বিশ্ববিদ্যালয়ের বা ব্যক্তিগত সম্পত্তির ক্ষতি।", RiskSeverity.Moderate),
+            ("মাদক ব্যবহার", "মাদক বা নিষিদ্ধ দ্রব্য ব্যবহার সংক্রান্ত অভিযোগ।", RiskSeverity.High),
         };
 
         var categories = await context.CaseCategories.ToListAsync();
@@ -38,10 +60,14 @@ public static class CaseCategorySeeder
             {
                 category = new CaseCategory { Id = Guid.NewGuid(), Name = choice.Category,
                     Description = choice.Description,
-                    AppliesToType = CaseCategoryAppliesTo.Type2,
+                    AppliesToType = CaseCategoryAppliesTo.Type2, RiskSeverity = choice.Severity,
                     SortOrder = categoryOrder++, IsActive = true, CreatedAt = now, UpdatedAt = now };
                 context.CaseCategories.Add(category);
                 categories.Add(category);
+            }
+            else
+            {
+                category.RiskSeverity = choice.Severity;
             }
         }
 
@@ -78,6 +104,8 @@ public static class CaseCategorySeeder
                 Description = desc,
                 IsActive = true,
                 AppliesToType = appliesTo,
+                RiskSeverity = name is "Substance Abuse" or "Harassment" ? RiskSeverity.High
+                    : name is "Other" ? RiskSeverity.Low : RiskSeverity.Moderate,
                 SortOrder = sort,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,

@@ -415,6 +415,49 @@ public class CaseService : ICaseService
         return ApiResponse<CaseDto>.SuccessResponse(updated!.ToDto(), "Case updated successfully.");
     }
 
+    public async Task<ApiResponse<CaseAccusedDto>> AddAccusedPersonAsync(
+        Guid id, CreateCaseAccusedRequest request, string actorName, string actorRole)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return ApiResponse<CaseAccusedDto>.FailResponse("Accused person name is required.");
+        if (request.Cgpa is < 0 or > 4)
+            return ApiResponse<CaseAccusedDto>.FailResponse("CGPA must be between 0 and 4.");
+
+        var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
+        if (c is null)
+            return ApiResponse<CaseAccusedDto>.FailResponse("Case not found.");
+        if (!CoordinatorMayView(actorRole, c))
+            return ApiResponse<CaseAccusedDto>.FailResponse("You don't have access to this case.");
+
+        var accused = new CaseAccused
+        {
+            Id = Guid.NewGuid(),
+            CaseId = c.Id,
+            Name = request.Name.Trim(),
+            AccusedStudentId = request.AccusedStudentId?.Trim() ?? string.Empty,
+            Department = request.Department?.Trim(),
+            Contact = request.Contact?.Trim(),
+            GuardianContact = request.GuardianContact?.Trim(),
+            Cgpa = request.Cgpa,
+            Order = c.AccusedPersons.Count == 0 ? 0 : c.AccusedPersons.Max(a => a.Order) + 1
+        };
+        _unitOfWork.Add(accused);
+
+        var roleLabel = FormatRoleLabel(actorRole);
+        _unitOfWork.Add(new TimelineEvent
+        {
+            Id = Guid.NewGuid(),
+            CaseId = c.Id,
+            Action = "Accused Person Added",
+            Description = $"{actorName} ({roleLabel}) added {accused.Name} as an accused person.",
+            User = actorName
+        });
+        c.UpdatedAt = DateTime.UtcNow;
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<CaseAccusedDto>.SuccessResponse(accused.ToDto(), "Accused person added.");
+    }
+
     /// <summary>
     /// The 24/7 Control Room number from Settings. Returns empty when the setting is
     /// missing or blank, in which case callers simply omit the contact line.
@@ -467,7 +510,7 @@ public class CaseService : ICaseService
                 msg += $"\n\nControl Room (24/7): {controlRoom}";
 
             await _notificationService.CreateAsync(c.SubmittedByUserId.Value, null,
-                "Case Acknowledged — Message from Administrative", msg, c.Id);
+                "Case Acknowledged — Message from Proctor Office", msg, c.Id);
         }
 
         var updated = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
@@ -522,7 +565,7 @@ public class CaseService : ICaseService
         {
             var isHandler = existing.User is not null && AssignableHandlerRoles.Contains(existing.User.Role);
             if (isHandler && !userGuids.Contains(existing.UserId))
-                existing.IsActive = false;
+                CancelAssignment(existing, "removed");
         }
 
         var newlyAssigned = new List<Guid>();
@@ -530,7 +573,7 @@ public class CaseService : ICaseService
         // Add new assignments for users not already active
         foreach (var uid in userGuids)
         {
-            var existing = c.Assignments.FirstOrDefault(a => a.UserId == uid);
+            var existing = c.Assignments.FirstOrDefault(a => a.UserId == uid && a.IsActive);
             if (existing is null)
             {
                 var assignment = new CaseAssignment
@@ -541,7 +584,8 @@ public class CaseService : ICaseService
                     AssignedById = actingUserId,
                     AssignedAt = DateTime.UtcNow,
                     IsActive = true,
-                    IsPrimary = primaryGuid.HasValue ? uid == primaryGuid.Value : false
+                    IsPrimary = primaryGuid.HasValue ? uid == primaryGuid.Value : false,
+                    Status = AssignmentStatus.Pending
                 };
                 c.Assignments.Add(assignment);
                 // Force the new row to be tracked as Added → INSERT. Adding it only through the
@@ -552,8 +596,6 @@ public class CaseService : ICaseService
             }
             else
             {
-                if (!existing.IsActive) newlyAssigned.Add(uid);
-                existing.IsActive = true;
                 existing.IsPrimary = primaryGuid.HasValue ? uid == primaryGuid.Value : existing.IsPrimary;
             }
         }
@@ -672,6 +714,13 @@ public class CaseService : ICaseService
             c.ClosedByName = updatedBy;
         }
 
+        if (IsTerminalStatus(newStatus))
+        {
+            foreach (var assignment in c.Assignments.Where(a => a.IsActive))
+                CompleteAssignment(assignment, newStatus.ToKebabCase());
+            c.AssignedToId = null;
+        }
+
         c.Status = newStatus;
 
         if (!string.IsNullOrWhiteSpace(request.Verdict))
@@ -783,12 +832,19 @@ public class CaseService : ICaseService
         var newlyMarkedConfidential = request.MarkAsConfidential && !c.IsConfidential && c.Type != CaseType.Confidential;
         if (newlyMarkedConfidential)
             c.IsConfidential = true;
+
+        // Finishing this hand-off completes the actor's current responsibility period.
+        // Complete it before creating a target assignment so forwarding back to oneself
+        // still creates a distinct, countable period.
+        foreach (var assignment in c.Assignments.Where(a => a.IsActive && a.UserId == actingUserId))
+            CompleteAssignment(assignment, "forwarded");
+
         c.Status = newStatus.Value;
         c.ForwardedToRole = request.TargetRole;
 
         if (!string.IsNullOrWhiteSpace(request.AssignedToUserId) && Guid.TryParse(request.AssignedToUserId, out var assigneeId))
         {
-            var existing = c.Assignments.FirstOrDefault(a => a.UserId == assigneeId);
+            var existing = c.Assignments.FirstOrDefault(a => a.UserId == assigneeId && a.IsActive);
             if (existing == null)
             {
                 var isFirst = !c.Assignments.Any(a => a.IsActive && a.IsPrimary);
@@ -800,17 +856,23 @@ public class CaseService : ICaseService
                     AssignedById = actingUserId,
                     AssignedAt = DateTime.UtcNow,
                     IsActive = true,
-                    IsPrimary = isFirst
+                    IsPrimary = isFirst,
+                    Status = AssignmentStatus.Pending
                 };
                 c.Assignments.Add(assignment);
                 _unitOfWork.Add(assignment);
 
                 if (isFirst) c.AssignedToId = assigneeId;
             }
-            else if (!existing.IsActive)
-            {
-                existing.IsActive = true;
-            }
+        }
+
+
+        if (c.AssignedToId == actingUserId && !c.Assignments.Any(a => a.IsActive && a.UserId == actingUserId))
+        {
+            var nextPrimary = c.Assignments.FirstOrDefault(a => a.IsActive && a.IsPrimary)
+                ?? c.Assignments.FirstOrDefault(a => a.IsActive);
+            c.AssignedToId = nextPrimary?.UserId;
+            if (nextPrimary is not null) nextPrimary.IsPrimary = true;
         }
 
         if (!string.IsNullOrWhiteSpace(request.Recommendation))
@@ -1007,7 +1069,7 @@ public class CaseService : ICaseService
         return c => c.AssignedToId == userId
                  || c.ForwardedToRole == userRole
                  || c.SubmittedByUserId == userId
-                 || c.Assignments.Any(a => a.UserId == userId && a.IsActive);
+                 || c.Assignments.Any(a => a.UserId == userId);
     }
 
     public async Task<ApiResponse<PagedResult<CaseListDto>>> GetMyCasesAsync(Guid userId, string userRole, int page, int pageSize)
@@ -1020,7 +1082,16 @@ public class CaseService : ICaseService
             .OrderByDescending(c => c.UpdatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(c => c.ToListDto());
+            .Select(c =>
+            {
+                var dto = c.ToListDto();
+                var latestAssignment = c.Assignments
+                    .Where(a => a.UserId == userId)
+                    .OrderByDescending(a => a.AssignedAt)
+                    .FirstOrDefault();
+                dto.TaskStatus = latestAssignment?.Status.ToKebabCase();
+                return dto;
+            });
 
         var result = new PagedResult<CaseListDto>
         {
@@ -1038,5 +1109,42 @@ public class CaseService : ICaseService
         var filter = BuildMyCasesFilter(userId, userRole);
         var count = await _unitOfWork.Cases.CountAsync(filter);
         return ApiResponse<int>.SuccessResponse(count);
+    }
+
+    private static bool IsTerminalStatus(CaseStatus status) => status is
+        CaseStatus.Closed or CaseStatus.Resolved or CaseStatus.Rejected
+        or CaseStatus.PoliceCase or CaseStatus.SuggestedType2;
+
+    private static string FormatRoleLabel(string role) => role switch
+    {
+        "coordinator" => "Assistant Administrative Officer",
+        "female-coordinator" => "Female Administrative Officer",
+        "vc" => "VC",
+        "dc-chairman" => "DC Chairman",
+        "dc-member" => "DC Member",
+        "dc-secretary" => "DC Secretary",
+        "super-admin" => "Super Admin",
+        _ => string.Join(" ", role.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]))
+    };
+
+    private static void CompleteAssignment(CaseAssignment assignment, string action)
+    {
+        assignment.IsActive = false;
+        assignment.IsPrimary = false;
+        assignment.Status = AssignmentStatus.Completed;
+        assignment.CompletedAt = DateTime.UtcNow;
+        assignment.CompletionAction = action;
+        assignment.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void CancelAssignment(CaseAssignment assignment, string action)
+    {
+        assignment.IsActive = false;
+        assignment.IsPrimary = false;
+        assignment.Status = AssignmentStatus.Cancelled;
+        assignment.CompletedAt = DateTime.UtcNow;
+        assignment.CompletionAction = action;
+        assignment.UpdatedAt = DateTime.UtcNow;
     }
 }

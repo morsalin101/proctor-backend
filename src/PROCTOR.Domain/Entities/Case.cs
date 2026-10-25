@@ -70,7 +70,6 @@ public class Case : BaseEntity
     public ICollection<CaseVerification> Verifications { get; set; } = new List<CaseVerification>();
     public ICollection<CaseComplainant> Complainants { get; set; } = new List<CaseComplainant>();
     public ICollection<CaseAccused> AccusedPersons { get; set; } = new List<CaseAccused>();
-    public ICollection<CaseAdditionalInfo> AdditionalInfos { get; set; } = new List<CaseAdditionalInfo>();
     public Type3Workflow? Type3Workflow { get; set; }
     public ICollection<InvestigationAttachment> InvestigationAttachments { get; set; } = new List<InvestigationAttachment>();
 

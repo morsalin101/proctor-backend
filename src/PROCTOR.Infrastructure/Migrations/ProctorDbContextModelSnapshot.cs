@@ -351,39 +351,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.ToTable("CaseAccusedPersons");
                 });
 
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAdditionalInfo", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Author")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("AuthorRole")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("CaseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CaseId");
-
-                    b.ToTable("CaseAdditionalInfos");
-                });
-
             modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -399,6 +366,12 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Property<Guid>("CaseId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompletionAction")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -407,6 +380,10 @@ namespace PROCTOR.Infrastructure.Migrations
 
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -445,6 +422,10 @@ namespace PROCTOR.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("RiskSeverity")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
@@ -1180,11 +1161,18 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasPrecision(3, 2)
                         .HasColumnType("numeric(3,2)");
 
+                    b.Property<decimal?>("CompletedCredits")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
                     b.Property<string>("Contact")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CurrentSemester")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Department")
                         .HasColumnType("text");
@@ -1210,15 +1198,33 @@ namespace PROCTOR.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<decimal?>("ExpectedCredits")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<decimal?>("OutstandingDues")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("RegistrationStatus")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RiskDataAsOf")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("StudentId")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UnregistrationReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1511,17 +1517,6 @@ namespace PROCTOR.Infrastructure.Migrations
                     b.Navigation("Case");
                 });
 
-            modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAdditionalInfo", b =>
-                {
-                    b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
-                        .WithMany("AdditionalInfos")
-                        .HasForeignKey("CaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Case");
-                });
-
             modelBuilder.Entity("PROCTOR.Domain.Entities.CaseAssignment", b =>
                 {
                     b.HasOne("PROCTOR.Domain.Entities.Case", "Case")
@@ -1731,8 +1726,6 @@ namespace PROCTOR.Infrastructure.Migrations
             modelBuilder.Entity("PROCTOR.Domain.Entities.Case", b =>
                 {
                     b.Navigation("AccusedPersons");
-
-                    b.Navigation("AdditionalInfos");
 
                     b.Navigation("Assignments");
 

@@ -53,3 +53,22 @@ public record DashboardCaseDto(Guid Id, string CaseNumber, string StudentName, s
     string? AssignedTo, DateTime CreatedAt, string? AccusedName, string? ComplainantName, string? Punishment, string? Collaborators);
 public record DashboardActivityDto(Guid CaseId, string CaseNumber, string Action,
     string User, DateTime Timestamp);
+
+public class ReportQueueCountsDto
+{
+    public int Pending { get; set; }
+    public int Completed { get; set; }
+}
+
+public class AssignmentWorkloadDto
+{
+    public List<AssignmentWorkloadPersonDto> People { get; set; } = [];
+}
+
+public record AssignmentWorkloadPersonDto(
+    Guid UserId,
+    string Name,
+    string Role,
+    int TotalAssigned,
+    int TotalCompleted,
+    int Pending);

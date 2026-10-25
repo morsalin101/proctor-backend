@@ -37,7 +37,6 @@ public class CaseRepository : Repository<Case>, ICaseRepository
             .Include(c => c.Complainants)
             .Include(c => c.AccusedPersons)
             .Include(c => c.Category)
-            .Include(c => c.AdditionalInfos)
             .Include(c => c.Assignments).ThenInclude(a => a.User)
             .Include(c => c.Type3Workflow)
             .FirstOrDefaultAsync(c => c.Id == id);

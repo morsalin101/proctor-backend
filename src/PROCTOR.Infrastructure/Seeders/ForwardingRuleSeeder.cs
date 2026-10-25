@@ -177,28 +177,6 @@ public static class ForwardingRuleSeeder
             });
         }
 
-        // Checked per role rather than "does any __draft_report__ row exist", so roles added
-        // later (the coordinators) also reach databases that were seeded before them.
-        var draftReportRoles = new[]
-        {
-            "proctor", "deputy-proctor", "assistant-proctor", "disciplinary-committee",
-            "coordinator", "female-coordinator", "super-admin"
-        };
-        foreach (var fromRole in draftReportRoles)
-        {
-            var exists = await context.ForwardingRules
-                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__draft_report__" && r.AppliesToType == "type-2");
-            if (exists) continue;
-
-            await context.ForwardingRules.AddAsync(new ForwardingRule
-            {
-                Id = Guid.NewGuid(),
-                FromRole = fromRole,
-                ToRole = "__draft_report__",
-                ResultStatus = "draft-report"
-            });
-        }
-
         await context.SaveChangesAsync();
     }
 }

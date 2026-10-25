@@ -172,6 +172,57 @@ public static class StudentSeeder
         if (changed) await context.SaveChangesAsync();
     }
 
+    public static async Task SeedRiskProfilesAsync(ProctorDbContext context)
+    {
+        const string flagKey = "accused_statistics_seed_profiles_v2";
+        if (await context.SystemSettings.AnyAsync(x => x.Key == flagKey && x.Value == "true")) return;
+
+        var profiles = new (string Key, decimal Cgpa, decimal Dues, decimal Completed, decimal Expected,
+            int Semester, RegistrationStatus Status, string? Reason)[]
+        {
+            ("123", 3.75m,     0m,  51m,  60m, 4, RegistrationStatus.Registered, null),
+            ("124", 3.25m, 18000m,  46m,  60m, 4, RegistrationStatus.Registered, null),
+            ("125", 2.75m, 18000m,  36m,  60m, 4, RegistrationStatus.Registered, null),
+            ("126", 2.25m, 88000m,  24m,  60m, 4, RegistrationStatus.Unregistered, "Outstanding dues"),
+            ("127", 3.50m,  6000m,  82m,  90m, 6, RegistrationStatus.Registered, null),
+            ("128", 3.00m, 35000m,  63m,  90m, 6, RegistrationStatus.Registered, null),
+            ("129", 2.90m, 35001m,  45m,  90m, 6, RegistrationStatus.Registered, null),
+            ("130", 2.40m, 96000m,  40m,  90m, 6, RegistrationStatus.Unregistered, "Financial hardship and outstanding dues"),
+            ("student@university.edu", 3.85m,     0m, 108m, 120m, 8, RegistrationStatus.Registered, null),
+            ("student2@university.edu", 3.35m, 22000m,  94m, 120m, 8, RegistrationStatus.Registered, null),
+            ("student3@university.edu", 2.65m, 47000m,  72m, 120m, 8, RegistrationStatus.Registered, null),
+            ("student4@university.edu", 2.15m, 110000m, 48m, 120m, 8, RegistrationStatus.Unregistered, "Outstanding dues"),
+            ("student5@university.edu", 3.55m, 12000m, 134m, 150m, 10, RegistrationStatus.Registered, null),
+            ("student6@university.edu", 3.00m, 34000m, 114m, 150m, 10, RegistrationStatus.Registered, null),
+            ("student7@university.edu", 2.50m, 65000m,  90m, 150m, 10, RegistrationStatus.Unregistered, "Personal reasons"),
+            ("student8@university.edu", 2.00m, 125000m, 60m, 150m, 10, RegistrationStatus.Unregistered, "Financial hardship"),
+        };
+
+        var all = await context.Students.ToListAsync();
+        foreach (var profile in profiles)
+        {
+            var student = all.FirstOrDefault(x => string.Equals(x.StudentId, profile.Key, StringComparison.OrdinalIgnoreCase))
+                ?? all.FirstOrDefault(x => string.Equals(x.Email, profile.Key, StringComparison.OrdinalIgnoreCase));
+            if (student is null) continue;
+            student.Cgpa = profile.Cgpa;
+            student.OutstandingDues = profile.Dues;
+            student.CompletedCredits = profile.Completed;
+            student.ExpectedCredits = profile.Expected;
+            student.CurrentSemester = profile.Semester;
+            student.RegistrationStatus = profile.Status;
+            student.UnregistrationReason = profile.Reason;
+            student.RiskDataAsOf = DateTime.UtcNow;
+            student.UpdatedAt = DateTime.UtcNow;
+        }
+
+        context.SystemSettings.Add(new SystemSetting
+        {
+            Id = Guid.NewGuid(), Key = flagKey, Value = "true", Category = "internal",
+            Description = "Guard flag: deterministic accused-statistics demo profiles and rule boundaries were seeded once."
+        });
+        await context.SaveChangesAsync();
+    }
+
     private static string BuildBatch(string department, string studentId)
     {
         var normalizedDepartment = department.Trim().ToLowerInvariant() switch

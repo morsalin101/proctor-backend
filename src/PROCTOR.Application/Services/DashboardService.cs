@@ -21,6 +21,12 @@ public class DashboardService : IDashboardService
     public async Task<ApiResponse<DashboardAnalyticsDto>> GetAnalyticsAsync(DashboardFilter filter, string role, Guid? userId) =>
         ApiResponse<DashboardAnalyticsDto>.SuccessResponse(await _analytics.GetAsync(filter, role, userId));
 
+    public async Task<ApiResponse<ReportQueueCountsDto>> GetReportQueueCountsAsync(string role, Guid? userId) =>
+        ApiResponse<ReportQueueCountsDto>.SuccessResponse(await _analytics.GetReportQueueCountsAsync(role, userId));
+
+    public async Task<ApiResponse<AssignmentWorkloadDto>> GetAssignmentWorkloadAsync(string role, Guid? userId) =>
+        ApiResponse<AssignmentWorkloadDto>.SuccessResponse(await _analytics.GetAssignmentWorkloadAsync(role, userId));
+
     public async Task<ApiResponse<DashboardStatsDto>> GetStatsAsync()
     {
         var totalCases = await _unitOfWork.Cases.CountAsync();

@@ -11,6 +11,13 @@ public class StudentDto
     public string? Email { get; set; }
     public string Gender { get; set; } = "unspecified";
     public decimal? Cgpa { get; set; }
+    public decimal? OutstandingDues { get; set; }
+    public decimal? CompletedCredits { get; set; }
+    public decimal? ExpectedCredits { get; set; }
+    public int? CurrentSemester { get; set; }
+    public string? RegistrationStatus { get; set; }
+    public string? UnregistrationReason { get; set; }
+    public string? RiskDataAsOf { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }
@@ -28,6 +35,13 @@ public class CreateStudentRequest
     public string? Email { get; set; }
     public string? Gender { get; set; }
     public decimal? Cgpa { get; set; }
+    public decimal? OutstandingDues { get; set; }
+    public decimal? CompletedCredits { get; set; }
+    public decimal? ExpectedCredits { get; set; }
+    public int? CurrentSemester { get; set; }
+    public string? RegistrationStatus { get; set; }
+    public string? UnregistrationReason { get; set; }
+    public DateTime? RiskDataAsOf { get; set; }
     public string? AdvisorName { get; set; }
     public string? FatherName { get; set; }
     public string? FatherContact { get; set; }

@@ -16,16 +16,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
 
     public async Task<DashboardAnalyticsDto> GetAsync(DashboardFilter filter, string role, Guid? userId)
     {
-        var source = _db.Cases.AsNoTracking().AsQueryable();
-        if (role == "student")
-            source = source.Where(c => userId.HasValue && c.SubmittedByUserId == userId.Value);
-        else if (role == "female-coordinator")
-            source = source.Where(c => c.IsConfidential || c.Type == CaseType.Confidential || c.Type == CaseType.Type1 || c.SubmitterGender == Gender.Female);
-        else if (role != "proctor" && role != "coordinator" && role != "super-admin" && role != "vc")
-            source = source.Where(c =>
-                (c.ForwardedToRole == role || (userId.HasValue &&
-                    (c.AssignedToId == userId.Value || c.Assignments.Any(a => a.IsActive && a.UserId == userId.Value))))
-                && ((!c.IsConfidential && c.Type != CaseType.Confidential) || role == "sexual-harassment-committee"));
+        var source = VisibleCases(role, userId);
 
         var departments = await source.Where(c => c.StudentDepartment != null && c.StudentDepartment != "")
             .Select(c => c.StudentDepartment!).Distinct().OrderBy(x => x).ToListAsync();
@@ -188,4 +179,110 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
 
     private static bool TryEnum<T>(string input, out T value) where T : struct, Enum =>
         Enum.TryParse(input.Replace("-", ""), true, out value);
+
+    public async Task<ReportQueueCountsDto> GetReportQueueCountsAsync(string role, Guid? userId)
+    {
+        var source = ReportVisibleCases(role, userId);
+        var pending = await source.CountAsync(c =>
+            (c.Type == CaseType.Type2 || c.Type == CaseType.Confidential)
+            && !c.Reports.Any(r => r.IsFinal));
+        var completed = await source.CountAsync(c => c.Reports.Any(r => r.IsFinal));
+        return new ReportQueueCountsDto { Pending = pending, Completed = completed };
+    }
+
+    public async Task<AssignmentWorkloadDto> GetAssignmentWorkloadAsync(string role, Guid? userId)
+    {
+        role = role.NormalizeRoleKey();
+        var peopleQuery = _db.Users.AsNoTracking()
+            .Where(u => u.IsActive && u.Role != UserRole.Student && u.Role != UserRole.External);
+
+        if (role == "proctor")
+        {
+            // Keep the Proctor's team view focused by omitting the specified senior,
+            // committee, DC-member and DC-secretary accounts.
+            var excludedRoles = new[]
+            {
+                UserRole.VC,
+                UserRole.DisciplinaryCommittee,
+                UserRole.SexualHarassmentCommittee,
+                UserRole.DCMember,
+                UserRole.DCSecretary,
+                UserRole.Chairman
+            };
+            peopleQuery = peopleQuery.Where(u => !excludedRoles.Contains(u.Role));
+        }
+        else
+        {
+            // Every other internal role sees only its own assignment totals. This
+            // avoids exposing colleagues' workload and keeps the chart personal.
+            if (!userId.HasValue)
+                return new AssignmentWorkloadDto();
+            peopleQuery = peopleQuery.Where(u => u.Id == userId.Value);
+        }
+
+        var people = await peopleQuery
+            .Select(u => new { u.Id, u.Name, u.Role })
+            .OrderBy(u => u.Name)
+            .ToListAsync();
+        var personIds = people.Select(p => p.Id).ToList();
+        var counts = await _db.CaseAssignments.AsNoTracking()
+            .Where(a => personIds.Contains(a.UserId))
+            .GroupBy(a => a.UserId)
+            .Select(g => new
+            {
+                UserId = g.Key,
+                Total = g.Count(),
+                Completed = g.Count(a => a.Status == AssignmentStatus.Completed),
+                Pending = g.Count(a => a.Status == AssignmentStatus.Pending)
+            })
+            .ToDictionaryAsync(x => x.UserId);
+
+        return new AssignmentWorkloadDto
+        {
+            People = people.Select(person =>
+            {
+                counts.TryGetValue(person.Id, out var count);
+                return new AssignmentWorkloadPersonDto(
+                    person.Id,
+                    person.Name,
+                    person.Role.ToKebabCase(),
+                    count?.Total ?? 0,
+                    count?.Completed ?? 0,
+                    count?.Pending ?? 0);
+            }).ToList()
+        };
+    }
+
+    private IQueryable<Case> VisibleCases(string role, Guid? userId)
+    {
+        role = role.NormalizeRoleKey();
+        var source = _db.Cases.AsNoTracking().AsQueryable();
+        if (role == "student")
+            return source.Where(c => userId.HasValue && c.SubmittedByUserId == userId.Value);
+        if (role == "female-coordinator")
+            return source.Where(c => c.IsConfidential || c.Type == CaseType.Confidential || c.Type == CaseType.Type1 || c.SubmitterGender == Gender.Female);
+        if (role is "proctor" or "coordinator" or "super-admin" or "vc")
+            return source;
+
+        return source.Where(c =>
+            (c.ForwardedToRole == role || (userId.HasValue &&
+                (c.AssignedToId == userId.Value || c.Assignments.Any(a => a.UserId == userId.Value))))
+            && ((!c.IsConfidential && c.Type != CaseType.Confidential) || role == "sexual-harassment-committee"));
+    }
+
+    private IQueryable<Case> ReportVisibleCases(string role, Guid? userId)
+    {
+        role = role.NormalizeRoleKey();
+        var source = _db.Cases.AsNoTracking().AsQueryable();
+        if (role == "student")
+            return source.Where(c => userId.HasValue && c.SubmittedByUserId == userId.Value);
+        if (role == "female-coordinator")
+            return source.Where(c => c.IsConfidential || c.Type == CaseType.Confidential
+                || c.Type == CaseType.Type1 || c.SubmitterGender == Gender.Female);
+        if (role == "sexual-harassment-committee")
+            return source.Where(c => c.ForwardedToRole == role);
+        if (role == "disciplinary-committee")
+            return source.Where(c => c.ForwardedToRole == role);
+        return source;
+    }
 }

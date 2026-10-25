@@ -132,6 +132,7 @@ public static class CaseSeeder
             .Include(c => c.Verifications)
             .Include(c => c.Reports)
             .Include(c => c.Type3Workflow)
+            .Include(c => c.AccusedPersons)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync();
         if (seededCases.Count == 0) return;
@@ -190,6 +191,31 @@ public static class CaseSeeder
             caseItem.StudentSemester ??= (index % 12) + 1;
             caseItem.Description = banglaDescriptions[index % banglaDescriptions.Length];
             caseItem.Recommendation ??= banglaRecommendations[index % banglaRecommendations.Length];
+            caseItem.IncidentDate = new DateTime(2022 + index % 5, 1 + index % 12, 1 + index % 25, 0, 0, 0, DateTimeKind.Utc);
+
+            var accusedStudent = students[(index + 3) % students.Count];
+            var accused = caseItem.AccusedPersons.OrderBy(person => person.Order).FirstOrDefault();
+            if (accused is null)
+            {
+                accused = new CaseAccused
+                {
+                    Id = Guid.NewGuid(), CaseId = caseItem.Id, Order = 0,
+                    CreatedAt = caseItem.CreatedAt, UpdatedAt = caseItem.UpdatedAt
+                };
+                caseItem.AccusedPersons.Add(accused);
+                context.CaseAccusedPersons.Add(accused);
+            }
+            accused.Name = accusedStudent.Name;
+            accused.AccusedStudentId = accusedStudent.StudentId;
+            accused.Department = accusedStudent.Department;
+            accused.Contact = accusedStudent.Contact;
+            accused.GuardianContact = accusedStudent.GuardianContact;
+            accused.Cgpa = accusedStudent.Cgpa;
+            caseItem.AccusedName = accused.Name;
+            caseItem.AccusedId = accused.AccusedStudentId;
+            caseItem.AccusedDepartment = accused.Department;
+            caseItem.AccusedContact = accused.Contact;
+            caseItem.AccusedGuardianContact = accused.GuardianContact;
 
             var preferredHandlers = caseItem.IsConfidential || student.Gender == Gender.Female
                 ? femaleCoordinators

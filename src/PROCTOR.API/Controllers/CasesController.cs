@@ -130,6 +130,24 @@ public class CasesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPost("{id:guid}/accused-persons")]
+    public async Task<IActionResult> AddAccusedPerson(Guid id, [FromBody] CreateCaseAccusedRequest request)
+    {
+        var role = GetCurrentUserRole();
+        if (role is "student" or "external")
+            return StatusCode(403, ApiResponse<object>.FailResponse("Only internal staff can add an accused person."));
+
+        var response = await _caseService.AddAccusedPersonAsync(id, request, GetCurrentUserName(), role);
+        if (!response.Success)
+        {
+            if (response.Message.Contains("access", StringComparison.OrdinalIgnoreCase))
+                return StatusCode(403, response);
+            if (response.Message == "Case not found.") return NotFound(response);
+            return BadRequest(response);
+        }
+        return Ok(response);
+    }
+
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateCaseStatus(Guid id, [FromBody] UpdateCaseStatusRequest request)
     {
@@ -160,17 +178,15 @@ public class CasesController : ControllerBase
     [HttpPost("{id:guid}/reports")]
     public async Task<IActionResult> CreateReport(Guid id, [FromBody] CreateReportRequest request)
     {
-        // Pending Reports → Create is the primary report permission. Keep the case-type
-        // __draft_report__ rule as an additional, narrower grant for workflow-only roles.
+        // Report creation is governed by the Pending Reports permission.
         var role = GetCurrentUserRole();
         var caseResponse = await _caseService.GetCaseByIdAsync(id, role);
         if (!caseResponse.Success || caseResponse.Data is null)
             return NotFound(caseResponse);
         var canCreateFromMenu = await _permissionChecker.HasPermissionAsync(role, "reports", "create");
-        var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
-        if (!canCreateFromMenu && !(special.Data?.CanDraftReport ?? false))
+        if (!canCreateFromMenu)
             return StatusCode(403, ApiResponse<object>.FailResponse(
-                "Your role cannot create reports. Enable Pending Reports → Create or the case-type Create draft report permission."));
+                "Your role cannot create reports. Enable Pending Reports → Create."));
 
         var createdByName = GetCurrentUserName();
         var userIdStr = GetCurrentUserId();
