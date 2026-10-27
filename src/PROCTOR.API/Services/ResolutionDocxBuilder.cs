@@ -30,24 +30,14 @@ public static class ResolutionDocxBuilder
             Paragraph(body, "Disciplinary Committee Resolution", true);
             Paragraph(body, $"Resolution: {resolution.ResolutionNumber}", true);
             Paragraph(body, $"Created by: {resolution.CreatedByName}");
-            foreach (var item in resolution.Cases.OrderBy(x => x.DisplayOrder))
-            {
-                Paragraph(body, $"{item.DisplayOrder}. Case {item.Case.CaseNumber}", true);
-                Paragraph(body, $"Short description: {item.ShortDescription}");
-                var remarks = item.Case.Type3Workflow?.MemberRemarks
-                    .Where(x => x.SubmittedAt.HasValue).OrderBy(x => x.MemberName).ToList() ?? [];
-                Paragraph(body, "DC Member Remarks", true);
-                foreach (var remark in remarks)
-                    Paragraph(body, $"{remark.MemberName}: {remark.Content}");
-                Paragraph(body, $"Secretary Resolution: {item.SecretaryRemarks}", true);
-            }
+            ResolutionTable(body, resolution.Cases.OrderBy(x => x.DisplayOrder));
             if (resolution.ApprovedAt.HasValue)
                 Paragraph(body, $"Approved by {resolution.ApprovedByName} on {resolution.ApprovedAt:yyyy-MM-dd HH:mm} UTC", true);
 
             var document = $"""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                  <w:body>{body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body>
+                  <w:body>{body}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080"/></w:sectPr></w:body>
                 </w:document>
                 """;
             Write(archive, "word/document.xml", document);
@@ -61,6 +51,75 @@ public static class ResolutionDocxBuilder
         sb.Append("<w:p><w:r>");
         if (bold) sb.Append("<w:rPr><w:b/></w:rPr>");
         sb.Append("<w:t xml:space=\"preserve\">").Append(text).Append("</w:t></w:r></w:p>");
+    }
+
+    private static void ResolutionTable(System.Text.StringBuilder sb, IEnumerable<DisciplinaryResolutionCase> cases)
+    {
+        sb.Append("<w:tbl><w:tblPr><w:tblW w:w=\"10000\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>")
+            .Append("<w:tblBorders><w:top w:val=\"single\" w:sz=\"8\" w:color=\"000000\"/>")
+            .Append("<w:left w:val=\"single\" w:sz=\"8\" w:color=\"000000\"/><w:bottom w:val=\"single\" w:sz=\"8\" w:color=\"000000\"/>")
+            .Append("<w:right w:val=\"single\" w:sz=\"8\" w:color=\"000000\"/><w:insideH w:val=\"single\" w:sz=\"6\" w:color=\"808080\"/>")
+            .Append("<w:insideV w:val=\"single\" w:sz=\"6\" w:color=\"808080\"/></w:tblBorders></w:tblPr>");
+
+        TableRow(sb,
+            ("Serial", 800),
+            ("Case ID", 1800),
+            ("Accused Information", 4000),
+            ("Punishment", 3400),
+            header: true);
+
+        foreach (var item in cases)
+        {
+            TableRow(sb,
+                (item.DisplayOrder.ToString(), 800),
+                (item.Case.CaseNumber, 1800),
+                (AccusedInformation(item.Case), 4000),
+                (item.SecretaryRemarks, 3400));
+        }
+        sb.Append("</w:tbl>");
+    }
+
+    private static void TableRow(System.Text.StringBuilder sb, params (string Value, int Width)[] cells) =>
+        TableRow(sb, cells, false);
+
+    private static void TableRow(System.Text.StringBuilder sb, (string Value, int Width) cell1, (string Value, int Width) cell2,
+        (string Value, int Width) cell3, (string Value, int Width) cell4, bool header) =>
+        TableRow(sb, [cell1, cell2, cell3, cell4], header);
+
+    private static void TableRow(System.Text.StringBuilder sb, IEnumerable<(string Value, int Width)> cells, bool header)
+    {
+        sb.Append("<w:tr>");
+        foreach (var (value, width) in cells)
+        {
+            sb.Append("<w:tc><w:tcPr><w:tcW w:w=\"").Append(width).Append("\" w:type=\"dxa\"/>");
+            if (header) sb.Append("<w:shd w:val=\"clear\" w:fill=\"D9EAF7\"/>");
+            sb.Append("</w:tcPr><w:p><w:r>");
+            if (header) sb.Append("<w:rPr><w:b/></w:rPr>");
+            sb.Append("<w:t xml:space=\"preserve\">").Append(SecurityElement.Escape(value ?? string.Empty)).Append("</w:t></w:r></w:p></w:tc>");
+        }
+        sb.Append("</w:tr>");
+    }
+
+    private static string AccusedInformation(Case c)
+    {
+        var accused = c.AccusedPersons.OrderBy(x => x.Order).Select(x =>
+        {
+            var details = new List<string> { x.Name };
+            if (!string.IsNullOrWhiteSpace(x.AccusedStudentId)) details.Add($"ID: {x.AccusedStudentId}");
+            if (!string.IsNullOrWhiteSpace(x.Department)) details.Add($"Department: {x.Department}");
+            if (!string.IsNullOrWhiteSpace(x.Contact)) details.Add($"Contact: {x.Contact}");
+            if (!string.IsNullOrWhiteSpace(x.GuardianContact)) details.Add($"Guardian: {x.GuardianContact}");
+            return string.Join(" | ", details);
+        }).ToList();
+        if (accused.Count > 0) return string.Join("; ", accused);
+        if (string.IsNullOrWhiteSpace(c.AccusedName)) return "Not provided";
+
+        var legacy = new List<string> { c.AccusedName };
+        if (!string.IsNullOrWhiteSpace(c.AccusedId)) legacy.Add($"ID: {c.AccusedId}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedDepartment)) legacy.Add($"Department: {c.AccusedDepartment}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedContact)) legacy.Add($"Contact: {c.AccusedContact}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedGuardianContact)) legacy.Add($"Guardian: {c.AccusedGuardianContact}");
+        return string.Join(" | ", legacy);
     }
 
     private static void Write(ZipArchive archive, string path, string content)

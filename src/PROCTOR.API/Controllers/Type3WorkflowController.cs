@@ -107,7 +107,12 @@ public class Type3WorkflowController : ControllerBase
         var workflows = await query.OrderByDescending(x => x.UpdatedAt).ToListAsync();
 
         var resolutionByCase = await _db.DisciplinaryResolutionCases.AsNoTracking()
-            .Include(x => x.Resolution).ToDictionaryAsync(x => x.CaseId);
+            .Include(x => x.Resolution)
+                .ThenInclude(x => x.Cases)
+                    .ThenInclude(x => x.Case)
+                        .ThenInclude(x => x.AccusedPersons)
+            .AsSplitQuery()
+            .ToDictionaryAsync(x => x.CaseId);
         var rows = workflows.Select(w => ToWorkflowDto(w, resolutionByCase.GetValueOrDefault(w.CaseId))).ToList();
         return Ok(ApiResponse<object>.SuccessResponse(rows));
     }
@@ -206,7 +211,7 @@ public class Type3WorkflowController : ControllerBase
         if (!await _permissions.HasPermissionAsync(Role, "dcs-reports", "create")) return Forbid();
         if (request.Cases.Count == 0) return BadRequest(ApiResponse<object>.FailResponse("Select at least one case."));
         if (request.Cases.Any(x => string.IsNullOrWhiteSpace(x.ShortDescription) || string.IsNullOrWhiteSpace(x.SecretaryRemarks)))
-            return BadRequest(ApiResponse<object>.FailResponse("Short description and secretary remarks are required for every case."));
+            return BadRequest(ApiResponse<object>.FailResponse("Short description and punishment / Secretary remarks are required for every case."));
         var ids = request.Cases.Select(x => x.CaseId).Distinct().ToList();
         if (ids.Count != request.Cases.Count) return BadRequest(ApiResponse<object>.FailResponse("A case can only appear once in a resolution."));
         var workflows = await _db.Type3Workflows.Include(x => x.Case).Include(x => x.MemberRemarks).Where(x => ids.Contains(x.CaseId)).ToListAsync();
@@ -320,7 +325,9 @@ public class Type3WorkflowController : ControllerBase
     }
 
     private IQueryable<DisciplinaryResolution> ResolutionQuery() => _db.DisciplinaryResolutions
-        .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.Type3Workflow).ThenInclude(x => x!.MemberRemarks);
+        .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.Type3Workflow).ThenInclude(x => x!.MemberRemarks)
+        .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.AccusedPersons)
+        .AsSplitQuery();
 
     private object ToWorkflowDto(Type3Workflow w, DisciplinaryResolutionCase? resolutionCase)
     {
@@ -337,8 +344,48 @@ public class Type3WorkflowController : ControllerBase
             remarks = Role is "dc-secretary" or "dc-chairman" or "chairman" or "super-admin"
                 ? w.MemberRemarks.Where(x => x.SubmittedAt.HasValue).Select(x => new { x.MemberName, x.Content, x.SubmittedAt }) : null,
             transitions = w.Transitions.OrderBy(x => x.CreatedAt).Select(x => new { from = x.FromStage.ToKebabCase(), to = x.ToStage.ToKebabCase(), x.ActorName, x.ActorRole, x.TargetRole, x.Remarks, x.CreatedAt }),
-            resolution = resolutionCase is null ? null : new { id = resolutionCase.ResolutionId, number = resolutionCase.Resolution.ResolutionNumber, status = resolutionCase.Resolution.Status.ToKebabCase() }
+            resolution = resolutionCase is null ? null : new
+            {
+                id = resolutionCase.ResolutionId,
+                number = resolutionCase.Resolution.ResolutionNumber,
+                status = resolutionCase.Resolution.Status.ToKebabCase(),
+                resolutionCase.Resolution.CreatedByName,
+                resolutionCase.Resolution.CreatedAt,
+                resolutionCase.Resolution.ForwardRemarks,
+                resolutionCase.Resolution.ApprovedByName,
+                resolutionCase.Resolution.ApprovedAt,
+                cases = resolutionCase.Resolution.Cases.OrderBy(x => x.DisplayOrder).Select(x => new
+                {
+                    serial = x.DisplayOrder,
+                    caseId = x.Case.CaseNumber,
+                    accusedInformation = AccusedInformation(x.Case),
+                    punishment = x.SecretaryRemarks
+                })
+            }
         };
+    }
+
+    private static string AccusedInformation(Case c)
+    {
+        var accused = c.AccusedPersons.OrderBy(x => x.Order).Select(x =>
+        {
+            var details = new List<string> { x.Name };
+            if (!string.IsNullOrWhiteSpace(x.AccusedStudentId)) details.Add($"ID: {x.AccusedStudentId}");
+            if (!string.IsNullOrWhiteSpace(x.Department)) details.Add($"Department: {x.Department}");
+            if (!string.IsNullOrWhiteSpace(x.Contact)) details.Add($"Contact: {x.Contact}");
+            if (!string.IsNullOrWhiteSpace(x.GuardianContact)) details.Add($"Guardian: {x.GuardianContact}");
+            return string.Join(" | ", details);
+        }).ToList();
+
+        if (accused.Count > 0) return string.Join("\n", accused);
+        if (string.IsNullOrWhiteSpace(c.AccusedName)) return "Not provided";
+
+        var legacy = new List<string> { c.AccusedName };
+        if (!string.IsNullOrWhiteSpace(c.AccusedId)) legacy.Add($"ID: {c.AccusedId}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedDepartment)) legacy.Add($"Department: {c.AccusedDepartment}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedContact)) legacy.Add($"Contact: {c.AccusedContact}");
+        if (!string.IsNullOrWhiteSpace(c.AccusedGuardianContact)) legacy.Add($"Guardian: {c.AccusedGuardianContact}");
+        return string.Join(" | ", legacy);
     }
 
     private static string StageLabel(Type3WorkflowStage stage) => stage switch
