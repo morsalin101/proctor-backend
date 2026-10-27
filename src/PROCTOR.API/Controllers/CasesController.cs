@@ -116,6 +116,8 @@ public class CasesController : ControllerBase
         var caseResponse = await _caseService.GetCaseByIdAsync(id, role);
         if (!caseResponse.Success || caseResponse.Data is null)
             return NotFound(caseResponse);
+        if (caseResponse.Data.Type != "type-1")
+            return BadRequest(ApiResponse<object>.FailResponse("Assign Handlers is available only for Message to Proctor submissions. Use Accept & Forward for Complain to Proctor cases."));
         var special = await _forwardingRuleService.GetSpecialPermissionsAsync(role, caseResponse.Data.Type);
         if (!(special.Data?.CanAssign ?? false))
             return StatusCode(403, ApiResponse<object>.FailResponse("Your role does not have case assignment permission."));

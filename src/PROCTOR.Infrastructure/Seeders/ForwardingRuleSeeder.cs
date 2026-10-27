@@ -58,7 +58,7 @@ public static class ForwardingRuleSeeder
     private static readonly string[] AssignerRoles =
         ["proctor", "coordinator", "female-coordinator", "super-admin"];
 
-    private const string AssignRolesFixFlagKey = "assign_roles_restricted";
+    private const string AssignRolesFixFlagKey = "assign_handlers_type1_only_v2";
 
     /// <summary>
     /// One-shot correction for databases seeded while the Assistant / Deputy Proctors also
@@ -71,7 +71,8 @@ public static class ForwardingRuleSeeder
         if (flag is { Value: "true" }) return;
 
         var stale = await context.ForwardingRules
-            .Where(r => r.ToRole == "__assign__" && !AssignerRoles.Contains(r.FromRole))
+            .Where(r => r.ToRole == "__assign__"
+                && (r.AppliesToType != "type-1" || !AssignerRoles.Contains(r.FromRole)))
             .ToListAsync();
         if (stale.Count > 0)
             context.ForwardingRules.RemoveRange(stale);
@@ -79,7 +80,7 @@ public static class ForwardingRuleSeeder
         foreach (var fromRole in AssignerRoles)
         {
             var exists = await context.ForwardingRules
-                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__assign__");
+                .AnyAsync(r => r.FromRole == fromRole && r.ToRole == "__assign__" && r.AppliesToType == "type-1");
             if (exists) continue;
 
             await context.ForwardingRules.AddAsync(new ForwardingRule
@@ -87,6 +88,7 @@ public static class ForwardingRuleSeeder
                 Id = Guid.NewGuid(),
                 FromRole = fromRole,
                 ToRole = "__assign__",
+                AppliesToType = "type-1",
                 ResultStatus = "assigned"
             });
         }
@@ -99,7 +101,7 @@ public static class ForwardingRuleSeeder
                 Key = AssignRolesFixFlagKey,
                 Value = "true",
                 Category = "internal",
-                Description = "Guard flag: the assign permission has been restricted to the office roles once."
+                Description = "Guard flag: Assign Handlers was restricted to Type-1 and office roles."
             });
         }
         else
@@ -139,19 +141,6 @@ public static class ForwardingRuleSeeder
                 new() { Id = Guid.NewGuid(), FromRole = "disciplinary-committee", ToRole = "__hearing__", ResultStatus = "hearing-scheduled" },
             };
             await context.ForwardingRules.AddRangeAsync(hearingRules);
-        }
-
-        var hasAssign = await context.ForwardingRules.AnyAsync(r => r.ToRole == "__assign__" && r.AppliesToType == "type-2");
-        if (!hasAssign)
-        {
-            var assignRules = AssignerRoles.Select(fromRole => new ForwardingRule
-            {
-                Id = Guid.NewGuid(),
-                FromRole = fromRole,
-                ToRole = "__assign__",
-                ResultStatus = "assigned"
-            }).ToList();
-            await context.ForwardingRules.AddRangeAsync(assignRules);
         }
 
         // The Administrative Officer ("coordinator") carries the Proctor's powers, so they get

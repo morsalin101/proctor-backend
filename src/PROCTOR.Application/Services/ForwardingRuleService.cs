@@ -46,14 +46,16 @@ public class ForwardingRuleService : IForwardingRuleService
 
     public async Task<ApiResponse<SpecialPermissionDto>> GetSpecialPermissionsAsync(string fromRole, string caseType = "type-2")
     {
+        var normalizedType = NormalizeCaseType(caseType);
         // Super-admin always has all special permissions
         if (fromRole == "super-admin")
             return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto
             {
-                CanClose = true, CanHearing = true, CanAssign = true
+                CanClose = true,
+                CanHearing = normalizedType == "type-2",
+                CanAssign = normalizedType == "type-1"
             });
 
-        var normalizedType = NormalizeCaseType(caseType);
         var rules = await _repository.FindAsync(r =>
             r.FromRole == fromRole && r.IsActive
             && r.AppliesToType == normalizedType
@@ -61,8 +63,8 @@ public class ForwardingRuleService : IForwardingRuleService
                 || r.ToRole == "__assign__"));
 
         var canClose = rules.Any(r => r.ToRole == "__close__");
-        var canHearing = rules.Any(r => r.ToRole == "__hearing__");
-        var canAssign = rules.Any(r => r.ToRole == "__assign__");
+        var canHearing = normalizedType == "type-2" && rules.Any(r => r.ToRole == "__hearing__");
+        var canAssign = normalizedType == "type-1" && rules.Any(r => r.ToRole == "__assign__");
         return ApiResponse<SpecialPermissionDto>.SuccessResponse(new SpecialPermissionDto
         {
             CanClose = canClose,
@@ -74,6 +76,10 @@ public class ForwardingRuleService : IForwardingRuleService
     public async Task<ApiResponse<ForwardingRuleDto>> CreateAsync(CreateForwardingRuleRequest request)
     {
         var appliesToType = NormalizeCaseType(request.AppliesToType);
+        if (request.ToRole == "__assign__" && appliesToType != "type-1")
+            return ApiResponse<ForwardingRuleDto>.FailResponse("Assign Handlers is available only for Message to Proctor submissions.");
+        if (request.ToRole == "__hearing__" && appliesToType == "type-1")
+            return ApiResponse<ForwardingRuleDto>.FailResponse("Hearings are available only for Complain to Proctor cases.");
         var existing = await _repository.FindAsync(r => r.FromRole == request.FromRole
             && r.ToRole == request.ToRole && r.AppliesToType == appliesToType);
         if (existing.Any())

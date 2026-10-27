@@ -47,7 +47,7 @@ public class Type3WorkflowController : ControllerBase
         if (report is null) return BadRequest(ApiResponse<object>.FailResponse("The selected finalized report was not found for this case."));
         if (c.Type3Workflow is not null || c.Type == CaseType.Type3) return Conflict(ApiResponse<object>.FailResponse("This case is already in the Type-3 workflow."));
         if (c.Type != CaseType.Type2 && c.Type != CaseType.Confidential && !c.IsConfidential)
-            return BadRequest(ApiResponse<object>.FailResponse("Only finalized Type-2 or confidential cases can be sent to Type-3."));
+            return BadRequest(ApiResponse<object>.FailResponse("Only finalized Complain to Proctor or confidential cases can be sent to Type-3."));
 
         var now = DateTime.UtcNow;
         foreach (var assignment in c.Assignments.Where(a => a.IsActive && a.UserId == UserId))
@@ -94,7 +94,11 @@ public class Type3WorkflowController : ControllerBase
             "vc" => query.Where(x => x.Transitions.Any(t => t.TargetRole == "vc" || t.ActorRole == "vc")),
             "dc-chairman" => query.Where(x => x.Transitions.Any(t => t.TargetRole == "dc-chairman" || t.ActorRole == "dc-chairman")),
             "dc-member" => query.Where(x => x.MemberRemarks.Any(r => r.MemberUserId == UserId)),
-            "dc-secretary" => query.Where(x => x.Transitions.Any(t => t.TargetRole == "dc-secretary" || t.ActorRole == "dc-secretary")),
+            // DC Member remarks are advisory. As soon as the DC Chairman sends the
+            // report to the members, the Secretary may prepare a resolution without
+            // waiting for every invited member to comment.
+            "dc-secretary" => query.Where(x => x.CurrentStage == Type3WorkflowStage.DcMemberReview
+                || x.Transitions.Any(t => t.TargetRole == "dc-secretary" || t.ActorRole == "dc-secretary")),
             "chairman" => query.Where(x => x.Transitions.Any(t => t.TargetRole == "chairman" || t.ActorRole == "chairman")),
             "super-admin" => query,
             _ => query.Where(_ => false)
@@ -165,6 +169,7 @@ public class Type3WorkflowController : ControllerBase
                 _db.DcMemberRemarks.Add(new DcMemberRemark { Id = Guid.NewGuid(), WorkflowId = workflow.Id, MemberUserId = member.Id, MemberName = member.Name });
                 AddNotification(member.Id, null, "Report Review Required", "A disciplinary report requires your remark in DC Members Reports.");
             }
+            AddNotification(null, "dc-secretary", "Report Available for Resolution", "A disciplinary report is open for optional DC Member remarks and is available in DCS Reports.");
         }
         else AddNotification(null, target, "Report Forwarded to You", $"A disciplinary report is waiting in {ReportQueueName(target)}.");
 
@@ -190,14 +195,6 @@ public class Type3WorkflowController : ControllerBase
         remark.SubmittedAt = DateTime.UtcNow;
         remark.UpdatedAt = DateTime.UtcNow;
 
-        if (workflow.MemberRemarks.Count == 6 && workflow.MemberRemarks.All(x => x.SubmittedAt.HasValue || x.Id == remark.Id))
-        {
-            var from = workflow.CurrentStage;
-            workflow.CurrentStage = Type3WorkflowStage.DcSecretaryReview;
-            workflow.UpdatedAt = DateTime.UtcNow;
-            AddTransition(workflow, from, workflow.CurrentStage, "dc-secretary", "All six DC Member remarks were submitted.");
-            AddNotification(null, "dc-secretary", "Report Ready for Resolution", "A disciplinary report has all six member remarks and is ready in DCS Reports.");
-        }
         await _db.SaveChangesAsync();
         return Ok(ApiResponse<object>.SuccessResponse(new { submitted = true }));
     }
@@ -213,8 +210,8 @@ public class Type3WorkflowController : ControllerBase
         var ids = request.Cases.Select(x => x.CaseId).Distinct().ToList();
         if (ids.Count != request.Cases.Count) return BadRequest(ApiResponse<object>.FailResponse("A case can only appear once in a resolution."));
         var workflows = await _db.Type3Workflows.Include(x => x.Case).Include(x => x.MemberRemarks).Where(x => ids.Contains(x.CaseId)).ToListAsync();
-        if (workflows.Count != ids.Count || workflows.Any(x => x.CurrentStage != Type3WorkflowStage.DcSecretaryReview || x.MemberRemarks.Count != 6 || x.MemberRemarks.Any(r => !r.SubmittedAt.HasValue)))
-            return Conflict(ApiResponse<object>.FailResponse("Every selected case must be awaiting resolution with all six remarks complete."));
+        if (workflows.Count != ids.Count || workflows.Any(x => x.CurrentStage is not (Type3WorkflowStage.DcMemberReview or Type3WorkflowStage.DcSecretaryReview)))
+            return Conflict(ApiResponse<object>.FailResponse("Every selected case must be available for DC Secretary resolution."));
         if (await _db.DisciplinaryResolutionCases.AnyAsync(x => ids.Contains(x.CaseId)))
             return Conflict(ApiResponse<object>.FailResponse("One or more selected cases already belong to a resolution."));
 
@@ -228,12 +225,20 @@ public class Type3WorkflowController : ControllerBase
         var order = 1;
         foreach (var input in request.Cases)
         {
+            var workflow = workflows.Single(x => x.CaseId == input.CaseId);
             resolution.Cases.Add(new DisciplinaryResolutionCase
             {
                 Id = Guid.NewGuid(), CaseId = input.CaseId, DisplayOrder = order++,
                 ShortDescription = input.ShortDescription.Trim(), SecretaryRemarks = input.SecretaryRemarks.Trim()
             });
-            foreach (var remark in workflows.Single(x => x.CaseId == input.CaseId).MemberRemarks) remark.LockedAt = DateTime.UtcNow;
+            if (workflow.CurrentStage == Type3WorkflowStage.DcMemberReview)
+            {
+                var from = workflow.CurrentStage;
+                workflow.CurrentStage = Type3WorkflowStage.DcSecretaryReview;
+                workflow.UpdatedAt = DateTime.UtcNow;
+                AddTransition(workflow, from, workflow.CurrentStage, "dc-secretary", input.SecretaryRemarks);
+            }
+            foreach (var remark in workflow.MemberRemarks) remark.LockedAt = DateTime.UtcNow;
         }
         _db.DisciplinaryResolutions.Add(resolution);
         await _db.SaveChangesAsync();
@@ -339,7 +344,7 @@ public class Type3WorkflowController : ControllerBase
     private static string StageLabel(Type3WorkflowStage stage) => stage switch
     {
         Type3WorkflowStage.RegistrarReview => "Sent to Registrar", Type3WorkflowStage.VcReview => "Forwarded to VC",
-        Type3WorkflowStage.DcChairmanReview => "Forwarded to DC Chairman", Type3WorkflowStage.DcMemberReview => "Awaiting DC Member Remarks",
+        Type3WorkflowStage.DcChairmanReview => "Forwarded to DC Chairman", Type3WorkflowStage.DcMemberReview => "Open for DC Member Remarks and DCS Resolution",
         Type3WorkflowStage.DcSecretaryReview => "Awaiting Resolution", Type3WorkflowStage.ResolutionDcChairmanReview => "Resolution Sent to DC Chairman",
         Type3WorkflowStage.ChairmanReview => "Resolution Sent to Chairman", Type3WorkflowStage.Completed => "Resolution Approved", _ => stage.ToString()
     };

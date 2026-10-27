@@ -243,7 +243,7 @@ public class CaseService : ICaseService
         // whole process even when the case is routed elsewhere, so they need the
         // full feed rather than only the cases forwarded directly to them.
         await _notificationService.CreateAsync(null, "proctor",
-            newCase.Type == CaseType.Type1 ? "New Type-1 Incident" : "New Case Submitted",
+            newCase.Type == CaseType.Type1 ? "New Message to Proctor" : "New Complaint Submitted",
             $"Case {caseNumber} has been submitted by {request.StudentName}.", newCase.Id);
 
         if (newCase.Type == CaseType.Type1)
@@ -475,7 +475,7 @@ public class CaseService : ICaseService
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
 
         if (c.Type != CaseType.Type1)
-            return ApiResponse<CaseDto>.FailResponse("Acknowledgment is only available for Type-1 cases.");
+            return ApiResponse<CaseDto>.FailResponse("Acknowledgment is only available for Message to Proctor submissions.");
 
         c.IsAcknowledged = true;
         c.AcknowledgedAt = DateTime.UtcNow;
@@ -526,6 +526,8 @@ public class CaseService : ICaseService
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(id);
         if (c is null)
             return ApiResponse<CaseDto>.FailResponse("Case not found.");
+        if (c.Type != CaseType.Type1)
+            return ApiResponse<CaseDto>.FailResponse("Assign Handlers is available only for Message to Proctor submissions. Use Accept & Forward for Complain to Proctor cases.");
 
         var userGuids = request.UserIds
             .Select(u => Guid.TryParse(u, out var g) ? g : (Guid?)null)
@@ -807,6 +809,11 @@ public class CaseService : ICaseService
 
         if (c.Type == CaseType.Type3)
             return ApiResponse<CaseDto>.FailResponse("Use the Type-3 report queue to forward this case.");
+        if (c.Type == CaseType.Type1)
+            return ApiResponse<CaseDto>.FailResponse("Message to Proctor submissions use Assign Handlers. Accept & Forward is available only for Complain to Proctor cases.");
+        if (string.IsNullOrWhiteSpace(request.Note))
+            return ApiResponse<CaseDto>.FailResponse("A forwarding note is required. It will be saved in Case Notes & Remarks.");
+        request.Note = request.Note.Trim();
 
         if (request.MarkAsConfidential)
         {
@@ -815,7 +822,7 @@ public class CaseService : ICaseService
             if (c.SubmitterGender != Gender.Female)
                 return ApiResponse<CaseDto>.FailResponse("Only a female-submitted case can be marked confidential in this workflow.");
             if (c.Type == CaseType.Type1)
-                return ApiResponse<CaseDto>.FailResponse("Type-1 incidents cannot be marked confidential during forwarding.");
+                return ApiResponse<CaseDto>.FailResponse("Message to Proctor submissions cannot be marked confidential during forwarding.");
         }
 
         // An open hearing must be closed out before the case moves on: the next role acts
@@ -969,7 +976,7 @@ public class CaseService : ICaseService
         // Investigation reports belong to the Type-2 workflow. Confidential is retained
         // here only for legacy rows; current confidential cases are Type2 + IsConfidential.
         if (c.Type is not (CaseType.Type2 or CaseType.Confidential))
-            return ApiResponse<ReportDto>.FailResponse("Only Type-2 cases can have investigation reports.");
+            return ApiResponse<ReportDto>.FailResponse("Only Complain to Proctor cases can have investigation reports.");
 
         var isFinal = request.IsFinal;
         var isDraft = !isFinal && request.IsDraft;
@@ -1018,7 +1025,7 @@ public class CaseService : ICaseService
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
         if (c is null) return ApiResponse<ReportDto>.FailResponse("Case not found.");
         if (c.Type is not (CaseType.Type2 or CaseType.Confidential))
-            return ApiResponse<ReportDto>.FailResponse("Only Type-2 cases can have investigation reports.");
+            return ApiResponse<ReportDto>.FailResponse("Only Complain to Proctor cases can have investigation reports.");
         var report = c.Reports.FirstOrDefault(r => r.Id == reportId);
         if (report is null) return ApiResponse<ReportDto>.FailResponse("Report not found.");
 

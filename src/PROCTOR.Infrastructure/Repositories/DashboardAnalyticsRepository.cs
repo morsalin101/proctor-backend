@@ -196,10 +196,11 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
         var peopleQuery = _db.Users.AsNoTracking()
             .Where(u => u.IsActive && u.Role != UserRole.Student && u.Role != UserRole.External);
 
-        if (role == "proctor")
+        if (role is "proctor" or "coordinator")
         {
-            // Keep the Proctor's team view focused by omitting the specified senior,
-            // committee, DC-member and DC-secretary accounts.
+            // The Proctor and Assistant Administrative Officer share the same focused
+            // proctorial-team view. Omit senior, committee, DC-member and DC-secretary
+            // accounts from both dashboards.
             var excludedRoles = new[]
             {
                 UserRole.VC,
