@@ -811,9 +811,14 @@ public class CaseService : ICaseService
             return ApiResponse<CaseDto>.FailResponse("Use the Type-3 report queue to forward this case.");
         if (c.Type == CaseType.Type1)
             return ApiResponse<CaseDto>.FailResponse("Message to Proctor submissions use Assign Handlers. Accept & Forward is available only for Complain to Proctor cases.");
-        if (string.IsNullOrWhiteSpace(request.Note))
+        // The first Type-2 hand-off is only an intake acceptance: the Proctor or an
+        // Administrative Officer selects the responsible person and forwards. Notes become
+        // mandatory for every subsequent hand-off after the case leaves Verified status.
+        var isInitialIntakeForward = c.Status == CaseStatus.Verified
+            && userRole is "proctor" or "coordinator" or "female-coordinator";
+        if (!isInitialIntakeForward && string.IsNullOrWhiteSpace(request.Note))
             return ApiResponse<CaseDto>.FailResponse("A forwarding note is required. It will be saved in Case Notes & Remarks.");
-        request.Note = request.Note.Trim();
+        request.Note = request.Note?.Trim();
 
         if (request.MarkAsConfidential)
         {

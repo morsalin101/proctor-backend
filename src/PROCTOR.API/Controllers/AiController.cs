@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PROCTOR.Application.Common;
@@ -63,7 +64,10 @@ public class AiController : ControllerBase
             return StatusCode(403, ApiResponse<object>.FailResponse(
                 "Your role cannot create reports. Enable Pending Reports → Create."));
 
-        var response = await _aiService.GenerateCaseReportAsync(caseId, request);
+        var rawUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(rawUserId, out var reportAuthorId)) return Unauthorized();
+
+        var response = await _aiService.GenerateCaseReportAsync(caseId, request, reportAuthorId);
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }

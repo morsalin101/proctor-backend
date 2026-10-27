@@ -12,5 +12,5 @@ public interface IAiService
     Task<ApiResponse<AiTestResultDto>> TestConnectionAsync(TestAiConnectionRequest request);
 
     /// <summary>Drafts a full investigation report for a case in the requested language.</summary>
-    Task<ApiResponse<GeneratedReportDto>> GenerateCaseReportAsync(Guid caseId, GenerateReportRequest request);
+    Task<ApiResponse<GeneratedReportDto>> GenerateCaseReportAsync(Guid caseId, GenerateReportRequest request, Guid reportAuthorId);
 }

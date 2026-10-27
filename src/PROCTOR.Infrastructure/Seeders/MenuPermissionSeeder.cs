@@ -404,7 +404,7 @@ public static class MenuPermissionSeeder
                 CanRead = true,
                 CanUpdate = !auditReadOnly,
                 CanDelete = !auditReadOnly,
-                CanSend = menuKey == "completed-reports" && role is UserRole.Proctor or UserRole.SuperAdmin,
+                CanSend = menuKey == "completed-reports" && role is UserRole.Proctor or UserRole.Coordinator or UserRole.FemaleCoordinator or UserRole.SuperAdmin,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -442,7 +442,7 @@ public static class MenuPermissionSeeder
 
     public static async Task BackfillType3PermissionsAsync(ProctorDbContext context)
     {
-        const string flagKey = "type3_permissions_backfilled";
+        const string flagKey = "type3_permissions_backfilled_v2";
         if (await context.SystemSettings.AnyAsync(x => x.Key == flagKey && x.Value == "true")) return;
         var grants = new Dictionary<UserRole, (string Menu, string Access)[]>
         {
@@ -469,7 +469,7 @@ public static class MenuPermissionSeeder
             }
         }
 
-        foreach (var role in new[] { UserRole.Proctor, UserRole.SuperAdmin })
+        foreach (var role in new[] { UserRole.Proctor, UserRole.Coordinator, UserRole.FemaleCoordinator, UserRole.SuperAdmin })
         {
             var roleId = RoleSeeder.GetDeterministicGuid(role);
             var permission = await context.MenuPermissions.FirstOrDefaultAsync(x => x.RoleId == roleId && x.MenuKey == "completed-reports");
@@ -482,7 +482,7 @@ public static class MenuPermissionSeeder
         context.SystemSettings.Add(new SystemSetting
         {
             Id = Guid.NewGuid(), Key = flagKey, Value = "true", Category = "internal",
-            Description = "Guard flag: Type-3 menus and initial Send permissions were seeded once."
+            Description = "Guard flag: Type-3 menus and Proctor/Administrative Officer Send permissions were seeded once."
         });
 
         await context.SaveChangesAsync();

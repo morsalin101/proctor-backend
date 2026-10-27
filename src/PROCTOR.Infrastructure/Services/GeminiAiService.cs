@@ -185,7 +185,7 @@ public class GeminiAiService : IAiService
 
     // ---------------------------------------------------------------- generation
 
-    public async Task<ApiResponse<GeneratedReportDto>> GenerateCaseReportAsync(Guid caseId, GenerateReportRequest request)
+    public async Task<ApiResponse<GeneratedReportDto>> GenerateCaseReportAsync(Guid caseId, GenerateReportRequest request, Guid reportAuthorId)
     {
         var c = await _unitOfWork.Cases.GetByIdWithDetailsAsync(caseId);
         if (c is null)
@@ -198,7 +198,9 @@ public class GeminiAiService : IAiService
         var model = await GetModelAsync();
         var isBangla = !string.Equals(request.Language, "english", StringComparison.OrdinalIgnoreCase);
         var articles = (await _articleRepo.FindAsync(a => a.IsActive)).OrderBy(a => a.Order).ToList();
-        var prompt = BuildPrompt(c, articles, isBangla, request.Instructions);
+        var users = (await _unitOfWork.Users.GetAllAsync()).ToList();
+        var reportAuthor = users.FirstOrDefault(x => x.Id == reportAuthorId);
+        var prompt = BuildPrompt(c, articles, users, reportAuthor, isBangla, request.Instructions);
 
         try
         {
@@ -360,7 +362,7 @@ public class GeminiAiService : IAiService
     private static string Line(string label, string? value) =>
         string.IsNullOrWhiteSpace(value) ? string.Empty : $"- {label}: {value}\n";
 
-    private static string BuildPrompt(Case c, List<Article> articles, bool isBangla, string? instructions)
+    private static string BuildPrompt(Case c, List<Article> articles, List<User> users, User? reportAuthor, bool isBangla, string? instructions)
     {
         var facts = new StringBuilder();
         facts.Append("CASE RECORD\n");
@@ -379,6 +381,15 @@ public class GeminiAiService : IAiService
         facts.Append(Line("Acknowledgment comment", c.AcknowledgmentComment));
         facts.Append(Line("Verdict recorded", c.Verdict));
         facts.Append(Line("Recommendation recorded", c.Recommendation));
+
+        if (reportAuthor is not null)
+        {
+            var authorDesignation = string.IsNullOrWhiteSpace(reportAuthor.RankName)
+                ? SplitPascalCase(reportAuthor.Role.ToString())
+                : reportAuthor.RankName;
+            facts.Append("\nREPORT AUTHOR (use exactly in the Report Written By table and closing)\n");
+            facts.Append($"- Name: {reportAuthor.Name}\n- Designation/rank: {authorDesignation}\n- System role: {SplitPascalCase(reportAuthor.Role.ToString())}\n");
+        }
 
         facts.Append("\nCOMPLAINANTS (name | student id | department | contact | advisor | father's name | father's contact)\n");
         if (c.Complainants.Count > 0)
@@ -417,11 +428,43 @@ public class GeminiAiService : IAiService
                 facts.Append($"- {d.Name} ({d.Type}) uploaded by {d.UploadedBy}\n");
         }
 
-        var officers = c.TimelineEvents
-            .Where(e => !string.IsNullOrWhiteSpace(e.User) && e.User != "System")
-            .Select(e => e.User).Distinct().ToList();
-        if (officers.Count > 0)
-            facts.Append($"\nOFFICERS WHO ACTED ON THIS CASE\n- {string.Join("\n- ", officers)}\n");
+        var officerNames = new List<string>();
+        void AddOfficer(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Equals("System", StringComparison.OrdinalIgnoreCase)) return;
+            if (!officerNames.Contains(name, StringComparer.OrdinalIgnoreCase)) officerNames.Add(name);
+        }
+
+        foreach (var assignment in c.Assignments.OrderBy(x => x.AssignedAt)) AddOfficer(assignment.User?.Name);
+        foreach (var timelineEvent in c.TimelineEvents.OrderBy(x => x.CreatedAt)) AddOfficer(timelineEvent.User);
+        AddOfficer(c.AcknowledgedByName);
+        foreach (var hearing in c.Hearings.OrderBy(x => x.CreatedAt))
+        {
+            AddOfficer(hearing.CreatedByName);
+            AddOfficer(hearing.ConductedByName);
+        }
+
+        if (officerNames.Count > 0)
+        {
+            var usersByName = users
+                .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+            facts.Append("\nOFFICERS WHO ACTED ON THIS CASE (name | designation/rank | system role)\n");
+            foreach (var officerName in officerNames)
+            {
+                if (usersByName.TryGetValue(officerName, out var officer))
+                {
+                    var designation = string.IsNullOrWhiteSpace(officer.RankName)
+                        ? SplitPascalCase(officer.Role.ToString())
+                        : officer.RankName;
+                    facts.Append($"- {officer.Name} | {designation} | {SplitPascalCase(officer.Role.ToString())}\n");
+                }
+                else
+                {
+                    facts.Append($"- {officerName} | (designation not recorded) | (role not recorded)\n");
+                }
+            }
+        }
 
         if (articles.Count > 0)
         {
@@ -519,6 +562,11 @@ public class GeminiAiService : IAiService
                 - EVERY person and EVERY field present in the case record must appear in the report.
                   If five complainants are listed, the table has five rows. If a father's name, advisor,
                   guardian contact, category, video link or evidence file is recorded, it appears somewhere.
+                - For every person under OFFICERS WHO ACTED ON THIS CASE, copy both the person's name and
+                  designation/rank into every applicable নাম | পদবী or Name | Designation table. Never leave
+                  the designation blank or replace it with an action when a designation is provided.
+                - The REPORT AUTHOR must appear in the তদন্ত লিখিত রিপোর্টার / Report Written By table and
+                  in the closing with the exact supplied designation/rank. Do not use a placeholder there.
                 - Never drop a value because it is written in the other language — translate it and include it.
                 - Add extra rows or a short labelled paragraph where a recorded detail does not fit an
                   existing section, rather than discarding it.
@@ -540,4 +588,7 @@ public class GeminiAiService : IAiService
                 Now output the HTML fragment only.
                 """;
     }
+
+    private static string SplitPascalCase(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
 }
