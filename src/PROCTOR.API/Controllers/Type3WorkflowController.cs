@@ -107,12 +107,7 @@ public class Type3WorkflowController : ControllerBase
         var workflows = await query.OrderByDescending(x => x.UpdatedAt).ToListAsync();
 
         var resolutionByCase = await _db.DisciplinaryResolutionCases.AsNoTracking()
-            .Include(x => x.Resolution)
-                .ThenInclude(x => x.Cases)
-                    .ThenInclude(x => x.Case)
-                        .ThenInclude(x => x.AccusedPersons)
-            .AsSplitQuery()
-            .ToDictionaryAsync(x => x.CaseId);
+            .Include(x => x.Resolution).ToDictionaryAsync(x => x.CaseId);
         var rows = workflows.Select(w => ToWorkflowDto(w, resolutionByCase.GetValueOrDefault(w.CaseId))).ToList();
         return Ok(ApiResponse<object>.SuccessResponse(rows));
     }
@@ -324,8 +319,38 @@ public class Type3WorkflowController : ControllerBase
         return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"{resolution.ResolutionNumber}.docx");
     }
 
+    [HttpGet("resolutions/{resolutionId:guid}")]
+    public async Task<IActionResult> GetResolution(Guid resolutionId)
+    {
+        if (Role is not ("dc-secretary" or "dc-chairman" or "chairman" or "super-admin")) return Forbid();
+        var menuKey = MenuKeyForRole(Role);
+        if (menuKey is null || !await _permissions.HasPermissionAsync(Role, menuKey, "read")) return Forbid();
+
+        var resolution = await ResolutionQuery().AsNoTracking().FirstOrDefaultAsync(x => x.Id == resolutionId);
+        if (resolution is null) return NotFound(ApiResponse<object>.FailResponse("Resolution not found."));
+
+        return Ok(ApiResponse<object>.SuccessResponse(new
+        {
+            id = resolution.Id,
+            number = resolution.ResolutionNumber,
+            status = resolution.Status.ToKebabCase(),
+            resolution.CreatedByName,
+            resolution.CreatedAt,
+            resolution.ForwardRemarks,
+            resolution.ApprovedByName,
+            resolution.ApprovedAt,
+            cases = resolution.Cases.OrderBy(x => x.DisplayOrder).Select(x => new
+            {
+                serial = x.DisplayOrder,
+                caseId = x.Case.CaseNumber,
+                accusedInformation = AccusedInformation(x.Case),
+                punishment = x.SecretaryRemarks
+            }).ToList()
+        }));
+    }
+
     private IQueryable<DisciplinaryResolution> ResolutionQuery() => _db.DisciplinaryResolutions
-        .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.Type3Workflow).ThenInclude(x => x!.MemberRemarks)
+        .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.Type3Workflow)
         .Include(x => x.Cases).ThenInclude(x => x.Case).ThenInclude(x => x.AccusedPersons)
         .AsSplitQuery();
 
@@ -344,24 +369,7 @@ public class Type3WorkflowController : ControllerBase
             remarks = Role is "dc-secretary" or "dc-chairman" or "chairman" or "super-admin"
                 ? w.MemberRemarks.Where(x => x.SubmittedAt.HasValue).Select(x => new { x.MemberName, x.Content, x.SubmittedAt }) : null,
             transitions = w.Transitions.OrderBy(x => x.CreatedAt).Select(x => new { from = x.FromStage.ToKebabCase(), to = x.ToStage.ToKebabCase(), x.ActorName, x.ActorRole, x.TargetRole, x.Remarks, x.CreatedAt }),
-            resolution = resolutionCase is null ? null : new
-            {
-                id = resolutionCase.ResolutionId,
-                number = resolutionCase.Resolution.ResolutionNumber,
-                status = resolutionCase.Resolution.Status.ToKebabCase(),
-                resolutionCase.Resolution.CreatedByName,
-                resolutionCase.Resolution.CreatedAt,
-                resolutionCase.Resolution.ForwardRemarks,
-                resolutionCase.Resolution.ApprovedByName,
-                resolutionCase.Resolution.ApprovedAt,
-                cases = resolutionCase.Resolution.Cases.OrderBy(x => x.DisplayOrder).Select(x => new
-                {
-                    serial = x.DisplayOrder,
-                    caseId = x.Case.CaseNumber,
-                    accusedInformation = AccusedInformation(x.Case),
-                    punishment = x.SecretaryRemarks
-                })
-            }
+            resolution = resolutionCase is null ? null : new { id = resolutionCase.ResolutionId, number = resolutionCase.Resolution.ResolutionNumber, status = resolutionCase.Resolution.Status.ToKebabCase() }
         };
     }
 
