@@ -18,11 +18,27 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
     {
         var source = VisibleCases(role, userId);
 
-        var departments = await source.Where(c => c.StudentDepartment != null && c.StudentDepartment != "")
-            .Select(c => c.StudentDepartment!).Distinct().OrderBy(x => x).ToListAsync();
-        var batches = await _db.Students.AsNoTracking()
-            .Where(s => s.Batch != "" && source.Any(c => c.StudentId == s.StudentId))
-            .Select(s => s.Batch).Distinct().OrderBy(x => x).ToListAsync();
+        var studentFilterOptions = await _db.Students.AsNoTracking()
+            .Where(s => source.Any(c => c.StudentId == s.StudentId))
+            .Where(s => s.Batch != "" || (s.Department != null && s.Department != ""))
+            .Select(s => new { s.Department, s.Batch })
+            .Distinct()
+            .ToListAsync();
+        var caseDepartments = await source.Where(c => c.StudentDepartment != null && c.StudentDepartment != "")
+            .Select(c => c.StudentDepartment!).Distinct().ToListAsync();
+        var departments = caseDepartments
+            .Concat(studentFilterOptions.Where(x => !string.IsNullOrWhiteSpace(x.Department)).Select(x => x.Department!))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+        var batches = studentFilterOptions.Where(x => !string.IsNullOrWhiteSpace(x.Batch))
+            .Select(x => x.Batch).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
+        var departmentBatches = studentFilterOptions
+            .Where(x => !string.IsNullOrWhiteSpace(x.Department) && !string.IsNullOrWhiteSpace(x.Batch))
+            .Select(x => new DashboardDepartmentBatchDto(x.Department!, BatchId(x.Batch), x.Batch))
+            .Distinct()
+            .OrderBy(x => x.Department).ThenBy(x => x.BatchId)
+            .ToList();
         var people = await _db.Users.AsNoTracking().Where(u => u.IsActive && u.Role != UserRole.Student && u.Role != UserRole.External)
             .Select(u => new { u.Id, u.Name, u.Role }).OrderBy(u => u.Name).ToListAsync();
 
@@ -44,10 +60,15 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             query = type == CaseType.Confidential
                 ? query.Where(c => c.IsConfidential || c.Type == CaseType.Confidential)
                 : query.Where(c => c.Type == type);
-        if (!string.IsNullOrWhiteSpace(filter.Department))
-            query = query.Where(c => c.StudentDepartment == filter.Department);
-        if (!string.IsNullOrWhiteSpace(filter.Batch))
-            query = query.Where(c => _db.Students.Any(s => s.StudentId == c.StudentId && s.Batch == filter.Batch));
+        var selectedDepartments = FilterValues(filter.Department);
+        if (selectedDepartments.Count > 0)
+            query = query.Where(c =>
+                (c.StudentDepartment != null && selectedDepartments.Contains(c.StudentDepartment))
+                || _db.Students.Any(s => s.StudentId == c.StudentId
+                    && s.Department != null && selectedDepartments.Contains(s.Department)));
+        var selectedBatches = FilterValues(filter.Batch);
+        if (selectedBatches.Count > 0)
+            query = query.Where(c => _db.Students.Any(s => s.StudentId == c.StudentId && selectedBatches.Contains(s.Batch)));
         // filter.SubjectId removed
         if (filter.CategoryId.HasValue)
             query = query.Where(c => c.CategoryId == filter.CategoryId.Value);
@@ -168,6 +189,7 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
             RoleWorkload = roleRows.Select(x => new DashboardGroupDto(x.Role ?? "Unrouted", x.Count)).ToList(),
             Departments = departments,
             Batches = batches,
+            DepartmentBatches = departmentBatches,
             People = people.Select(p => new DashboardPersonDto(p.Id, p.Name, p.Role.ToKebabCase())).ToList(),
             Cases = cases.Select(c => new DashboardCaseDto(c.Id, c.CaseNumber, c.StudentName, c.StudentId,
                 c.StudentDepartment, c.Batch, c.CategoryName, c.StudentSemester, c.StudentCgpa, c.Status.ToKebabCase(), c.Type.ToKebabCase(), c.AssignedTo, c.CreatedAt, c.AccusedName, c.ComplainantName, c.Punishment, c.Collaborators)).ToList(),
@@ -179,6 +201,19 @@ public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
 
     private static bool TryEnum<T>(string input, out T value) where T : struct, Enum =>
         Enum.TryParse(input.Replace("-", ""), true, out value);
+
+    private static List<string> FilterValues(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    private static string BatchId(string batch)
+    {
+        var parts = batch.Split(['_', '-', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length > 1 ? parts[^1] : batch.Trim();
+    }
 
     public async Task<ReportQueueCountsDto> GetReportQueueCountsAsync(string role, Guid? userId)
     {

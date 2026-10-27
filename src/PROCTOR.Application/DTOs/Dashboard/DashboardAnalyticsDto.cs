@@ -39,6 +39,7 @@ public class DashboardAnalyticsDto
     public List<DashboardGroupDto> RoleWorkload { get; set; } = [];
     public List<string> Departments { get; set; } = [];
     public List<string> Batches { get; set; } = [];
+    public List<DashboardDepartmentBatchDto> DepartmentBatches { get; set; } = [];
     public List<DashboardPersonDto> People { get; set; } = [];
     public List<DashboardCaseDto> Cases { get; set; } = [];
     public List<DashboardActivityDto> Activity { get; set; } = [];
@@ -48,6 +49,7 @@ public class DashboardAnalyticsDto
 
 public record DashboardGroupDto(string Name, int Count);
 public record DashboardPersonDto(Guid Id, string Name, string Role);
+public record DashboardDepartmentBatchDto(string Department, string BatchId, string Batch);
 public record DashboardCaseDto(Guid Id, string CaseNumber, string StudentName, string StudentId,
     string? Department, string? Batch, string? CategoryName, int? Semester, decimal? Cgpa, string Status, string Type,
     string? AssignedTo, DateTime CreatedAt, string? AccusedName, string? ComplainantName, string? Punishment, string? Collaborators);
